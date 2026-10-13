@@ -248,6 +248,10 @@ Rectangle {
             patchStack.push("StepSequencer.qml", {"effect": effect_id, "effect_type":"step_sequencer"});
             patch_bay.current_help_text = "" // Constants.help[""];
         }
+        else if (effect_type == "BiPoSeq" || effect_type == "BiPoSeq_ext"){
+            patchStack.push("BiPoSeq.qml", {"effect": effect_id, "effect_type": effect_type});
+            patch_bay.current_help_text = "Tap a step, then press the three dots to type a value."
+        }
         else if (effect_type == "step_sequencer_ext"){
             patchStack.push("StepSequencer.qml", {"effect": effect_id});
             patch_bay.current_help_text = "" // Constants.help[""];

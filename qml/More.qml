@@ -138,6 +138,19 @@ Item {
                 width: 150
                 spacing : 20
                 height: parent.height
+                PolyButton { // BiPoSeq: +/- sign key, only for controls that can go negative
+                    visible: currentEffects[current_effect]["controls"][row_param].rmin < 0
+                    height: 70
+                    width: 150
+                    text: "+/-"
+                    onClicked: {
+                        control.current_value = control.current_value.charAt(0) == "-" ? control.current_value.slice(1) : "-" + control.current_value;
+                    }
+                    Material.foreground: Constants.poly_pink
+                    border_color: Constants.poly_pink
+                    Material.background: Constants.background_color
+                    font_size: 36
+                }
                 PolyButton {
                     height: 95
                     width: 150
