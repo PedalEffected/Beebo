@@ -1,4 +1,5 @@
 # digit main
+from beebo_paths import P
 from collections import defaultdict
 # import Adafruit_BBIO.GPIO as GPIO
 import time, queue, threading, json
@@ -32,7 +33,7 @@ max_knob_speed = 20
 input_queue = queue.Queue()
 hardware_info = {}
 try:
-    with open("/pedal_state/hardware_info.json") as f:
+    with open(P("/pedal_state/hardware_info.json")) as f:
         hardware_info = json.load(f)
 except:
     hardware_info = {"revision": 9, "pedal": "digit"}

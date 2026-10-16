@@ -1,0 +1,39 @@
+# Builds Beebo.app for Apple Silicon Macs on GitHub's macOS machines.
+# Run it from the Actions tab ("Build Mac app" -> Run workflow), or push to
+# the desktop branch. The app, the module report and a screenshot of the
+# Beebo screen are attached to the run as "Beebo-macOS".
+name: Build Mac app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [desktop]
+    paths:
+      - "desktop/**"
+      - "qml/**"
+      - "*.py"
+      - "poly_style/**"
+      - "biposeq/**"
+      - "droplets/**"
+      - ".github/workflows/mac-app.yml"
+
+jobs:
+  mac:
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Beebo.app
+        run: bash desktop/mac/build_app.sh
+
+      - name: Attach the app and reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Beebo-macOS
+          path: |
+            build/mac/Beebo-macOS-*.zip
+            build/mac/report/
+          if-no-files-found: warn
+          retention-days: 30

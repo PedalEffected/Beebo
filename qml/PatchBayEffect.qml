@@ -337,7 +337,7 @@ Rectangle {
         {
             patch_bay.current_help_text = Constants.help["reverb_detail"];
             patchStack.push("ReverbBrowser.qml", {"effect": effect_id,  "effect_type": effect_type,
-            "top_folder": "file:///audio/reverbs/",
+            "top_folder": beeboPaths.audio + "reverbs/",
             "is_cab": false,
             "after_file_selected": (function(name) { 
                 // console.log("got new reveb file");
@@ -350,7 +350,7 @@ Rectangle {
         // {
         //     patch_bay.current_help_text = Constants.help["reverb_detail"];
         //     patchStack.push("ReverbBrowser.qml", {"effect": effect_id,  "effect_type": effect_type,
-        //     "top_folder": "file:///audio/amp_json",
+        //     "top_folder": beeboPaths.audio + "amp_json",
         //     "after_file_selected": (function(name) { 
         //         // console.log("got new reveb file");
         //         // console.log("file is", name.toString());
@@ -362,7 +362,7 @@ Rectangle {
         {
             patch_bay.current_help_text = ""
             patchStack.push("AmpBrowser.qml", {"effect": effect_id,  "effect_type": effect_type,
-            "top_folder": "file:///audio/amp_nam",
+            "top_folder": beeboPaths.audio + "amp_nam",
             // "after_file_selected": (function(name) { 
             //     // console.log("got new reveb file");
             //     // console.log("file is", name.toString());
@@ -373,7 +373,7 @@ Rectangle {
         else if (effect_type == "mono_cab" || effect_type == "short_mono_cab" || effect_type == "stereo_cab" || effect_type == "quad_ir_cab"){
             patch_bay.current_help_text = Constants.help["reverb_detail"];
             patchStack.push("ReverbBrowser.qml", {"effect": effect_id, "effect_type": effect_type,
-            "top_folder": "file:///audio/cabs/",
+            "top_folder": beeboPaths.audio + "cabs/",
             "is_cab": true,
             "after_file_selected": (function(name) { 
                 // console.log("got new reveb file");

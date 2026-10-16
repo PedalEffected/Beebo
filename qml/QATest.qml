@@ -83,7 +83,7 @@ Item {
 			height: 200
 			text: "Load test preset"
 			onClicked: {
-				knobs.ui_load_qa_preset_by_name("file:///mnt/presets/beebo/Quad_delay.ingen")
+				knobs.ui_load_qa_preset_by_name(beeboPaths.presets + "/beebo/Quad_delay.ingen")
 			}
 		}
 		Label {

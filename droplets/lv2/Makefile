@@ -17,11 +17,19 @@ ENGINE_SRC = beads/dsp/processor.cc beads/dsp/synth.cc beads/dsp/mu_law.cc \
              stmlib/utils/random.cc stmlib/dsp/units.cc
 SRC = droplets.cc $(addprefix $(EURORACK)/,$(ENGINE_SRC))
 
+# Export only lv2_descriptor. The binary keeps the .so name on macOS too:
+# LV2 hosts load it with dlopen, which doesn't care about the extension.
+ifeq ($(shell uname),Darwin)
+  EXPORTS = -Wl,-exported_symbol,_lv2_descriptor
+else
+  EXPORTS = -Wl,--version-script=exports.map
+endif
+
 all: $(BUILDDIR)/droplets.so $(BUILDDIR)/manifest.ttl $(BUILDDIR)/droplets.ttl
 
 $(BUILDDIR)/droplets.so: $(SRC)
 	@mkdir -p $(BUILDDIR)
-	$(CXX) $(CXXFLAGS) -shared -Wl,--version-script=exports.map -o $@ $(SRC) $(LDFLAGS) -lm
+	$(CXX) $(CXXFLAGS) -shared $(EXPORTS) -o $@ $(SRC) $(LDFLAGS) -lm
 
 $(BUILDDIR)/%.ttl: %.ttl
 	@mkdir -p $(BUILDDIR)

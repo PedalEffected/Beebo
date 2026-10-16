@@ -1,0 +1,4 @@
+module QtQuick.VirtualKeyboard
+InputPanel 2.0 InputPanel.qml
+InputPanel 2.1 InputPanel.qml
+InputPanel 2.15 InputPanel.qml

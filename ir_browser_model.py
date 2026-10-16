@@ -1,5 +1,6 @@
 # import sys
 # import psutil
+from beebo_paths import P
 import glob, json, math, itertools
 import os
 import os.path
@@ -18,7 +19,7 @@ needs: title, description, location, files
 """
 ir_browser_singleton = None
 # metadata_start_path = "/home/loki/shared/cabs_and_reverbs/" # reverbs and cabs
-metadata_start_path = "/audio/" # reverbs and cabs
+metadata_start_path = P("/audio/") # reverbs and cabs
 ir_folders  = {True: [], False: []}
 # favourites = {}
 reverse_files  = {True: {}, False: {}}

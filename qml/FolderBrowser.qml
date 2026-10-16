@@ -21,7 +21,7 @@ import Qt.labs.folderlistmodel 2.2
         property string effect
         property url current_selected: currentEffects[effect]["controls"]["ir"].name
         property string display_name: remove_suffix(mainRect.basename(mainRect.current_selected))
-        property url top_folder: "file:///audio/reverbs/"
+        property url top_folder: beeboPaths.audio + "reverbs/"
         property var after_file_selected: (function(name) { return null; })
         property bool is_loading: false
         property bool swipeable: false

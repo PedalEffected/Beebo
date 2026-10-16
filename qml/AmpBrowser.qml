@@ -29,7 +29,7 @@ Item {
     property string effect_type
     property url current_selected: currentEffects[effect]["controls"]["ir"].name
 	property string selected_amp_name: rsplit(current_selected.toString(), "/", 2)[1] 
-    property url top_folder: "file:///audio/amp_nam/"
+    property url top_folder: beeboPaths.audio + "amp_nam/"
     property var after_file_selected: (function(name) { return null; })
     property bool is_loading: false
     property bool showing_fav: false

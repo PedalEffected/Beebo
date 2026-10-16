@@ -17,6 +17,7 @@
 import os
 import re
 import socket
+from beebo_paths import INGEN_SOCKET
 import sys
 import time
 
@@ -88,7 +89,7 @@ def lv2_path():
 
 
 class Remote(Interface):
-    def __init__(self, uri='unix:///tmp/ingen.sock'):
+    def __init__(self, uri='unix://' + INGEN_SOCKET):
         self.msg_id      = 1
         self.server_base = uri + '/'
         self.server_uri = uri

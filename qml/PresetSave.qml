@@ -465,7 +465,7 @@ import QtQuick.Controls.Material 2.3
                         // Layout.fillHeight: true
                         height: 400
                         width: 500
-						top_folder: "file:///mnt/presets"
+						top_folder: beeboPaths.presets
                     }
                     // create new folder
 
@@ -606,7 +606,7 @@ import QtQuick.Controls.Material 2.3
                     delegate:PolyControls.ItemDelegate {
                         width: parent.width
                         height: 50
-                        text: index + " " + edit.slice(20, -6) // trim .ingen and /mnt/preset
+                        text: index + " " + edit.slice(beeboPaths.presets.length + 1, -6) // trim .ingen and the presets folder
                         bottomPadding: 10
                         font.pixelSize: fontSizeMedium
                         topPadding: 10

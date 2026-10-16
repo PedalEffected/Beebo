@@ -1,5 +1,6 @@
 # import sys
 # import psutil
+from beebo_paths import P
 import glob, json, math, itertools
 import os
 import os.path
@@ -20,7 +21,7 @@ amp_browser_singleton = None
 current_filters = set()
 current_search = ""
 # start_path = "/git_repos/capture_to_pedal"
-start_path = "/mnt/audio/amp_nam"
+start_path = P("/mnt/audio/amp_nam")
 amp_folders  = None #glob.glob(start_path+"/*/metadata.json", recursive=True)
 filtered_amps = None #amp_folders.copy()
 favourites = {}

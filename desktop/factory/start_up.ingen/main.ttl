@@ -1,0 +1,212 @@
+@prefix atom: <http://lv2plug.in/ns/ext/atom#> .
+@prefix doap: <http://usefulinc.com/ns/doap#> .
+@prefix ingen: <http://drobilla.net/ns/ingen#> .
+@prefix lv2: <http://lv2plug.in/ns/lv2core#> .
+@prefix midi: <http://lv2plug.in/ns/ext/midi#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix patch: <http://lv2plug.in/ns/ext/patch#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<control>
+	ingen:canvasX 32.0 ;
+	ingen:canvasY 32.0 ;
+	atom:bufferType atom:Sequence ;
+	atom:supports patch:Message ;
+	<http://lv2plug.in/ns/ext/resize-port#minimumSize> 4096 ;
+	lv2:designation lv2:control ;
+	lv2:index 0 ;
+	lv2:name "Control" ;
+	lv2:portProperty lv2:connectionOptional ;
+	lv2:symbol "control" ;
+	a atom:AtomPort ,
+		lv2:InputPort .
+
+<in_1>
+	ingen:canvasX 1192.0 ;
+	ingen:canvasY 80.0 ;
+	lv2:index 2 ;
+	lv2:name "in_1" ;
+	lv2:symbol "in_1" ;
+	a lv2:AudioPort ,
+		lv2:InputPort .
+
+<in_2>
+	ingen:canvasX 1192.0 ;
+	ingen:canvasY 160.0 ;
+	lv2:index 3 ;
+	lv2:name "in_2" ;
+	lv2:symbol "in_2" ;
+	a lv2:AudioPort ,
+		lv2:InputPort .
+
+<in_3>
+	ingen:canvasX 1192.0 ;
+	ingen:canvasY 240.0 ;
+	lv2:index 4 ;
+	lv2:name "in_3" ;
+	lv2:symbol "in_3" ;
+	a lv2:AudioPort ,
+		lv2:InputPort .
+
+<in_4>
+	ingen:canvasX 1192.0 ;
+	ingen:canvasY 320.0 ;
+	lv2:index 5 ;
+	lv2:name "in_4" ;
+	lv2:symbol "in_4" ;
+	a lv2:AudioPort ,
+		lv2:InputPort .
+
+<in_5>
+	ingen:canvasX 1192.0 ;
+	ingen:canvasY 400.0 ;
+	lv2:index 6 ;
+	lv2:name "in_5" ;
+	lv2:symbol "in_5" ;
+	a lv2:AudioPort ,
+		lv2:InputPort .
+
+<in_6>
+	ingen:canvasX 1192.0 ;
+	ingen:canvasY 480.0 ;
+	lv2:index 7 ;
+	lv2:name "in_6" ;
+	lv2:symbol "in_6" ;
+	a lv2:AudioPort ,
+		lv2:InputPort .
+
+<>
+	ingen:polyphony 1 ;
+	<http://lv2plug.in/ns/extensions/ui#ui> ingen:GraphUIGtk2 ;
+	lv2:extensionData <http://lv2plug.in/ns/ext/state#interface> ;
+	lv2:port <control> ,
+		<in_1> ,
+		<in_2> ,
+		<in_3> ,
+		<in_4> ,
+		<in_5> ,
+		<in_6> ,
+		<midi_in> ,
+		<midi_out> ,
+		<notify> ,
+		<out_1> ,
+		<out_2> ,
+		<out_3> ,
+		<out_4> ,
+		<out_5> ,
+		<out_6> ,
+		<out_7> ,
+		<out_8> ;
+	doap:name "start_up" ;
+	a ingen:Graph ,
+		lv2:Plugin .
+
+<midi_in>
+	ingen:canvasX 1192.0 ;
+	ingen:canvasY 560.0 ;
+	atom:bufferType atom:Sequence ;
+	atom:supports midi:MidiEvent ;
+	lv2:index 16 ;
+	lv2:name "MIDI In" ;
+	lv2:symbol "midi_in" ;
+	a atom:AtomPort ,
+		lv2:InputPort .
+
+<midi_out>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 720.0 ;
+	atom:bufferType atom:Sequence ;
+	atom:supports midi:MidiEvent ;
+	lv2:index 17 ;
+	lv2:name "MIDI Out" ;
+	lv2:symbol "midi_out" ;
+	a atom:AtomPort ,
+		lv2:OutputPort .
+
+<notify>
+	ingen:canvasX 128.0 ;
+	ingen:canvasY 32.0 ;
+	atom:bufferType atom:Sequence ;
+	atom:supports patch:Message ;
+	<http://lv2plug.in/ns/ext/resize-port#minimumSize> 4096 ;
+	lv2:designation lv2:control ;
+	lv2:index 1 ;
+	lv2:name "Notify" ;
+	lv2:portProperty lv2:connectionOptional ;
+	lv2:symbol "notify" ;
+	a atom:AtomPort ,
+		lv2:OutputPort .
+
+<out_1>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 80.0 ;
+	lv2:index 8 ;
+	lv2:name "out_1" ;
+	lv2:symbol "out_1" ;
+	a lv2:AudioPort ,
+		lv2:OutputPort .
+
+<out_2>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 160.0 ;
+	lv2:index 9 ;
+	lv2:name "out_2" ;
+	lv2:symbol "out_2" ;
+	a lv2:AudioPort ,
+		lv2:OutputPort .
+
+<out_3>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 240.0 ;
+	lv2:index 10 ;
+	lv2:name "out_3" ;
+	lv2:symbol "out_3" ;
+	a lv2:AudioPort ,
+		lv2:OutputPort .
+
+<out_4>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 320.0 ;
+	lv2:index 11 ;
+	lv2:name "out_4" ;
+	lv2:symbol "out_4" ;
+	a lv2:AudioPort ,
+		lv2:OutputPort .
+
+<out_5>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 400.0 ;
+	lv2:index 12 ;
+	lv2:name "out_5" ;
+	lv2:symbol "out_5" ;
+	a lv2:AudioPort ,
+		lv2:OutputPort .
+
+<out_6>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 480.0 ;
+	lv2:index 13 ;
+	lv2:name "out_6" ;
+	lv2:symbol "out_6" ;
+	a lv2:AudioPort ,
+		lv2:OutputPort .
+
+<out_7>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 560.0 ;
+	lv2:index 14 ;
+	lv2:name "out_7" ;
+	lv2:symbol "out_7" ;
+	a lv2:AudioPort ,
+		lv2:OutputPort .
+
+<out_8>
+	ingen:canvasX -20.0 ;
+	ingen:canvasY 640.0 ;
+	lv2:index 15 ;
+	lv2:name "out_8" ;
+	lv2:symbol "out_8" ;
+	a lv2:AudioPort ,
+		lv2:OutputPort .

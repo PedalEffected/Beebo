@@ -1,3 +1,4 @@
+from beebo_paths import P
 import ingen
 from queue import Queue
 import json
@@ -87,7 +88,7 @@ def DestinationThread( ) :
         if ingen_started == False:
             with ingen_started_lock:
                 if ingen_started == False:
-                    while not os.path.exists("/tmp/ingen.sock"):
+                    while not os.path.exists(P("/tmp/ingen.sock")):
                         time.sleep(0.1)
                     time.sleep(0.2)
 
@@ -266,7 +267,7 @@ def set_json_nam(effect_id, file_name):
     effect_id = effect_id
     file_name = urllib.parse.quote(file_name)
     # strip anything before audio, shouldn't get to here..
-    n = file_name.find("/audio")
+    n = file_name.find(P("/audio"))
     file_name = file_name[n:]
     # print("setting json file", effect_id, file_name)
     body = """[
@@ -311,7 +312,7 @@ def get_valid_filename(s):
 def save_pedalboard(pedal_name, name, current_sub_graph):
     clean_filename = get_valid_filename(name)
     if len(clean_filename) > 0:
-        q.put((ingen.copy, current_sub_graph, "file:///mnt/presets/"+pedal_name+"/"+clean_filename+".ingen"))
+        q.put((ingen.copy, current_sub_graph, P("file:///mnt/presets/")+pedal_name+"/"+clean_filename+".ingen"))
         # q.put((ingen.copy, "/main", "file:///mnt/presets/"+clean_filename+".ingen"))
 
 def load_pedalboard(name, current_sub_graph):
@@ -360,7 +361,7 @@ def ingen_recv_thread( ) :
         if ingen_started == False:
             with ingen_started_lock:
                 if ingen_started == False:
-                    while not os.path.exists("/tmp/ingen.sock"):
+                    while not os.path.exists(P("/tmp/ingen.sock")):
                         time.sleep(0.1)
                     time.sleep(0.2)
                     ingen.socket_connect()
@@ -382,7 +383,7 @@ def ingen_recv_thread( ) :
             bundle = {}
             try:
             # if True:
-                with open("/tmp/ingen.json", "w") as f:
+                with open(P("/tmp/ingen.json"), "w") as f:
                     f.write(r)
                 bundle = json.loads(r)
 
@@ -728,7 +729,7 @@ def start_send_thread():
 #     # server = "tcp://192.168.1.139:16180"
 #     server = "tcp://10.1.1.246:16180"
 # server = "tcp://localhost:16180"
-server = "unix:///tmp/ingen.sock"
+server = "unix://" + P("/tmp/ingen.sock")
 ingen = ingen.Remote(server)
 
 # """

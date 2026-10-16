@@ -1,6 +1,7 @@
+from beebo_paths import P
 import sys, time, json, os.path, os, subprocess, queue, threading, traceback, glob
 import shutil
-os.environ["QT_IM_MODULE"] = "qtvirtualkeyboard"
+if os.environ.get("BEEBO_DESKTOP") != "1": os.environ["QT_IM_MODULE"] = "qtvirtualkeyboard"  # on-screen keyboard (pedal only)
 from signal import signal, SIGINT, SIGTERM
 from time import sleep
 from sys import exit
@@ -27,11 +28,15 @@ def exception_hook(exctype, value, tb):
     sys.exit(1)
 sys.excepthook = exception_hook
 
+import beebo_paths
+beebo_paths.ensure_dirs()
+beebo_paths.install_desktop_shell_hooks()
+
 import stat
 ingen_is_ready = False
 while not ingen_is_ready:
     try:
-        mode = os.stat("/tmp/ingen.sock").st_mode
+        mode = os.stat(P("/tmp/ingen.sock")).st_mode
         if stat.S_ISSOCK(mode):
             ingen_is_ready = True
         else:
@@ -40,7 +45,7 @@ while not ingen_is_ready:
         time.sleep(0.2)
 time.sleep(0.2)
 
-os.environ["QT_IM_MODULE"] = "qtvirtualkeyboard"
+if os.environ.get("BEEBO_DESKTOP") != "1": os.environ["QT_IM_MODULE"] = "qtvirtualkeyboard"  # on-screen keyboard (pedal only)
 import icons.icons
 # #, imagine_assets
 import resource_rc
@@ -51,6 +56,7 @@ import ingen_wrapper
 import pedal_hardware
 import module_info
 from static_globals import IS_REMOTE_TEST
+from beebo_paths import IS_DESKTOP
 import loopler as loopler_lib
 import module_browser_model
 import preset_browser_model
@@ -98,9 +104,10 @@ class PatchMode(IntEnum):
 context = None
 amp_browser_model_s = None
 
+_DEBUG = os.environ.get("BEEBO_DEBUG") == "1"
 def debug_print(*args, **kwargs):
-    pass
-    # print( "From py: "+" ".join(map(str,args)), **kwargs)
+    if _DEBUG:
+        print( "From py: "+" ".join(map(str,args)), **kwargs)
 
 
 effect_type_maps = module_info.effect_type_maps
@@ -158,14 +165,14 @@ hardware_info = {}
 def load_preset_list():
     global preset_list
     try:
-        with open("/mnt/pedal_state/beebo_preset_list.json") as f:
+        with open(P("/mnt/pedal_state/beebo_preset_list.json")) as f:
             preset_list = json.load(f)
     except:
-        preset_list = ["file:///mnt/presets/beebo/Empty.ingen"]
+        preset_list = [P("file:///mnt/presets/beebo/Empty.ingen")]
     preset_list_model.setStringList(preset_list)
 
 try:
-    with open("/pedal_state/hardware_info.json") as f:
+    with open(P("/pedal_state/hardware_info.json")) as f:
         hardware_info = json.load(f)
     hardware_info["revision"]
 except:
@@ -409,14 +416,14 @@ def jump_to_preset(is_inc, num, initial=False):
         knobs.ui_load_preset_by_name(p_list[current_preset.value], initial)
 
 def write_pedal_state():
-    if IS_REMOTE_TEST:
+    if IS_REMOTE_TEST and not IS_DESKTOP:
         return
-    with open("/mnt/pedal_state/state.json", "w") as f:
+    with open(P("/mnt/pedal_state/state.json"), "w") as f:
         json.dump(pedal_state, f)
     os.sync()
 
 def write_preset_meta_cache(initial=False):
-    with open("/mnt/pedal_state/preset_meta.json", "w") as f:
+    with open(P("/mnt/pedal_state/preset_meta.json"), "w") as f:
         json.dump(preset_meta_data, f)
     os.sync()
     if not initial:
@@ -425,7 +432,7 @@ def write_preset_meta_cache(initial=False):
 def load_preset_meta_cache():
     global preset_meta_data
     try:
-        with open("/mnt/pedal_state/preset_meta.json") as f:
+        with open(P("/mnt/pedal_state/preset_meta.json")) as f:
             preset_meta_data = json.load(f)
             if len(preset_meta_data) < 3: # at least some elements
                 try:
@@ -439,14 +446,14 @@ def load_preset_meta_cache():
             preset_meta_data = {}
 
 def write_favourites_data():
-    with open("/mnt/pedal_state/favourites.json", "w") as f:
+    with open(P("/mnt/pedal_state/favourites.json"), "w") as f:
         json.dump(favourites, f)
     os.sync()
 
 def load_favourites_data():
     global favourites
     try:
-        with open("/mnt/pedal_state/favourites.json") as f:
+        with open(P("/mnt/pedal_state/favourites.json")) as f:
             favourites = json.load(f)
     except:
         favourites = {"modules":{}, "presets":{}}
@@ -455,7 +462,7 @@ def load_favourites_data():
 def load_pedal_state():
     global pedal_state
     try:
-        with open("/mnt/pedal_state/state.json") as f:
+        with open(P("/mnt/pedal_state/state.json")) as f:
             pedal_state = json.load(f)
             if "input_level" not in pedal_state:
                 pedal_state["input_level"] = 0
@@ -475,7 +482,8 @@ def load_pedal_state():
                 pedal_state["d_is_tuner"] = True
     except:
         pedal_state = {"input_level": 0, "midi_channel": 1, "author": "poly player",
-                "model": "beebo", "thru": True, "invert_enc": False, "screen_flipped": False, "l_to_r": False,
+                # the desktop app starts as a Hector (6 in, 8 out); change it in Settings
+                "model": "hector" if IS_DESKTOP else "beebo", "thru": True, "invert_enc": False, "screen_flipped": False, "l_to_r": False,
                 "d_is_tuner": True}
 
 
@@ -731,7 +739,7 @@ def from_backend_disconnect(head, tail):
 def get_meta_from_files(initial=False):
     r_dict = {}
     def get_rdf_element_from_files(rdf_name="rdfs:comment", element_name="description"):
-        command =  'grep -ir "'+ rdf_name +'" /mnt/presets'
+        command =  'grep -ir "'+ rdf_name +'" ' + P("/mnt/presets")
         # command =  ['grep' , '-ir',  '"'+ element_name +'"',  '/mnt/presets']
         ret_obj = subprocess.run(command, capture_output=True, shell=True)
         for a in ret_obj.stdout.splitlines():
@@ -1029,9 +1037,9 @@ class Knobs(QObject, metaclass=properties.PropertyMeta):
     def ui_load_empty_preset(self, force=False):
         if force:
             # load_preset("file:///mnt/presets/beebo/Empty.ingen/main.ttl", True)
-            knobs.ui_load_qa_preset_by_name("file:///mnt/presets/beebo/Empty.ingen")
+            knobs.ui_load_qa_preset_by_name(P("file:///mnt/presets/beebo/Empty.ingen"))
         else:
-            knobs.ui_load_preset_by_name("file:///mnt/presets/beebo/Empty.ingen")
+            knobs.ui_load_preset_by_name(P("file:///mnt/presets/beebo/Empty.ingen"))
 
 
     @Slot(str)
@@ -1079,7 +1087,7 @@ class Knobs(QObject, metaclass=properties.PropertyMeta):
         # update preset meta
         clean_filename = ingen_wrapper.get_valid_filename(pedalboard_name)
         if len(clean_filename) > 0:
-            filename = "/mnt/presets/beebo/"+clean_filename+".ingen"
+            filename = P("/mnt/presets/beebo/")+clean_filename+".ingen"
             global current_preset_filename
             global previous_preset_filename
             previous_preset_filename = current_preset_filename
@@ -1181,15 +1189,18 @@ class Knobs(QObject, metaclass=properties.PropertyMeta):
     @Slot(result=str)
     def remaining_user_storage(self):
         # return how much space in mb is available
+        if IS_DESKTOP:
+            free = shutil.disk_usage(beebo_paths.DATA_DIR).free
+            return "%.1fG" % (free / 1e9)
         return subprocess.check_output(['df','-h', '--output=avail', '/dev/mmcblk0p2']).split()[1].decode('utf-8')
 
     @Slot(result=str)
     def usb_information_text(self):
         # return how much space in mb is available
         return f"""<h3>USB info</h3>
-        <p>Cabs: {self.ui_usb_folder_size("/usb_flash/cabs")} </p>
-        <p>Reverbs: {self.ui_usb_folder_size("/usb_flash/reverbs")} </p>
-        <p>Amps: {self.ui_usb_folder_size("/usb_flash/amps")} </p>
+        <p>Cabs: {self.ui_usb_folder_size(P("/usb_flash/cabs"))} </p>
+        <p>Reverbs: {self.ui_usb_folder_size(P("/usb_flash/reverbs"))} </p>
+        <p>Amps: {self.ui_usb_folder_size(P("/usb_flash/amps"))} </p>
         <h3>Remaining user storage</h3>
         <p>{self.remaining_user_storage()}</p>
         """
@@ -1254,7 +1265,7 @@ class Knobs(QObject, metaclass=properties.PropertyMeta):
         # if the drive can't be remounted RW then auto repair the drive and restart
         # /sbin/e2fsck -fy /dev/mmcblk0p1
         command_status[0].name = "Firmware update failed. The files were found, the flash drive appears to work but something else happened, please contact us. info@polyeffects.com Extra debugging info:"
-        if len(glob.glob("/usb_flash/*.deb")) > 0:
+        if len(glob.glob(P("/usb_flash/*.deb"))) > 0:
             command = """sudo /usr/bin/polyoverlayroot-chroot dpkg -i -E -G /usb_flash/*.deb && sync && sudo shutdown -h 'now'"""
             # sync then sleep before shutdown
             command_status[0].value = -1
@@ -1279,7 +1290,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
 
     @Slot()
     def ui_run_debug(self):
-        if len(glob.glob("/usb_flash/*.sh")) > 0:
+        if len(glob.glob(P("/usb_flash/*.sh"))) > 0:
             command = """sudo /bin/bash /usb_flash/debug.sh"""
             command_status[0].value = -1
             self.launch_subprocess(command)
@@ -1362,7 +1373,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
     def set_preset_list_length(self, v):
         if v > len(preset_list_model.stringList()):
             # debug_print("inserting new row in preset list", v)
-            insert_row(preset_list_model, "file:///mnt/presets/beebo/Default_Preset.ingen")
+            insert_row(preset_list_model, P("file:///mnt/presets/beebo/Default_Preset.ingen"))
         else:
             # debug_print("removing row in preset list", v)
             preset_list_model.removeRows(v, 1)
@@ -1374,13 +1385,13 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
     @Slot()
     def save_preset_list(self):
         # debug_print("saving preset list")
-        with open("/mnt/pedal_state/beebo_preset_list.json", "w") as f:
+        with open(P("/mnt/pedal_state/beebo_preset_list.json"), "w") as f:
             json.dump(preset_list_model.stringList(), f)
         os.sync()
 
     @Slot()
     def reset_preset_list(self):
-        preset_list = ["file:///mnt/presets/beebo/Empty.ingen"]
+        preset_list = [P("file:///mnt/presets/beebo/Empty.ingen")]
         preset_list_model.setStringList(preset_list)
         self.save_preset_list()
 
@@ -1464,7 +1475,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
         ir = ir[len("file://"):]
         # can be a directory or file
         # check if it isn't a base dir. 
-        if "imported" not in ir or ir in ["/audio/cabs/imported", "/audio/reverbs/imported"]:
+        if "imported" not in ir or ir in [P("/audio/cabs/imported"), P("/audio/reverbs/imported")]:
             return
         # delete
         # remount as RW
@@ -1488,10 +1499,10 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
         # remount as RW
         command = "sudo mount -o remount,rw /dev/mmcblk0p2 /mnt"
         ret_var = subprocess.call(command, shell=True)
-        shutil.rmtree("/mnt/audio/cabs")
-        shutil.rmtree("/mnt/audio/reverbs")
-        os.mkdir("/mnt/audio/cabs")
-        os.mkdir("/mnt/audio/reverbs")
+        shutil.rmtree(P("/mnt/audio/cabs"))
+        shutil.rmtree(P("/mnt/audio/reverbs"))
+        os.mkdir(P("/mnt/audio/cabs"))
+        os.mkdir(P("/mnt/audio/reverbs"))
         os.sync()
         # remount as RO
         command = "sudo mount -o remount,ro /dev/mmcblk0p2 /mnt"
@@ -1503,7 +1514,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
         debug_print("delete: preset_file files is ", preset_file)
         # is always a directory
         # empty / default
-        if ".ingen" not in preset_file or preset_file in ["/mnt/presets/digit/Default_Preset.ingen", "/mnt/presets/beebo/Empty.ingen", "/mnt/presets/digit/Empty.ingen"]:
+        if ".ingen" not in preset_file or preset_file in [P("/mnt/presets/digit/Default_Preset.ingen"), P("/mnt/presets/beebo/Empty.ingen"), P("/mnt/presets/digit/Empty.ingen")]:
             return
         # delete
         try: # if it doesn't exist, we still want to remove it from the preset list and meta cache
@@ -1524,7 +1535,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
     @Slot()
     def save_preset_list(self):
         debug_print("saving preset list")
-        with open("/mnt/pedal_state/beebo_preset_list.json", "w") as f:
+        with open(P("/mnt/pedal_state/beebo_preset_list.json"), "w") as f:
             json.dump(preset_list_model.stringList(), f)
         os.sync()
     preset_list_model.setStringList(preset_list)
@@ -1934,12 +1945,12 @@ def toggle_tuner():
         return
     preset_load_counter.value = preset_load_counter.value + 1
 
-    if current_preset_filename == "/mnt/presets/beebo/Tuner.ingen":
+    if current_preset_filename == P("/mnt/presets/beebo/Tuner.ingen"):
         # if we've got a previous_preset, jump to it
         if previous_preset_filename != "":
             knobs.ui_load_preset_by_name("file://"+previous_preset_filename)
     else:
-        knobs.ui_load_preset_by_name("file:///mnt/presets/beebo/Tuner.ingen")
+        knobs.ui_load_preset_by_name(P("file:///mnt/presets/beebo/Tuner.ingen"))
 
 def handle_foot_change(switch_name, timestamp):
     # debug_print(switch_name, timestamp)
@@ -2298,12 +2309,12 @@ if __name__ == "__main__":
     app.setFont(font)
 
     # preset might not have been copied on an update, as file system might not have been supported
-    if not os.path.isfile("/mnt/presets/beebo/Empty.ingen/main.ttl") and not IS_REMOTE_TEST:
+    if not os.path.isfile(P("/mnt/presets/beebo/Empty.ingen/main.ttl")) and not IS_REMOTE_TEST:
         # rsync
         command = "sudo rsync -a /to_nor_flash/ /nor_flash"
         ret_var = subprocess.call(command, shell=True)
 
-    if os.path.isfile("/mnt/presets/digit/Empty.ingen/main.ttl") and not IS_REMOTE_TEST:
+    if os.path.isfile(P("/mnt/presets/digit/Empty.ingen/main.ttl")) and not IS_REMOTE_TEST:
         # first time running after merge update
         command = "mv -f /mnt/presets/digit/* /mnt/presets/beebo/;rm -rf /mnt/presets/digit/*"
         ret_var = subprocess.call(command, shell=True)
@@ -2399,7 +2410,31 @@ if __name__ == "__main__":
     context.setContextProperty("favourites", favourites)
     context.setContextProperty("pedalState", pedal_state)
     context.setContextProperty("currentIP", current_ip)
+    # where presets / IRs / amp models live (pedal folders, or ~/Beebo on a desktop)
+    context.setContextProperty("beeboPaths", {
+        "presets": beebo_paths.url("/mnt/presets"),
+        "audio": beebo_paths.url("/audio") + "/",
+        "data": "file://" + beebo_paths.DATA_DIR,
+        "isDesktop": IS_DESKTOP})
     engine.load(QUrl("qml/TopLevelWindow.qml"))
+    if IS_DESKTOP:
+        # closing the window quits (the pedal never closes its screen)
+        def desktop_quit():
+            EXIT_PROCESS[0] = True
+            ingen_wrapper._FINISH = True
+            import ingen as ingen_module
+            ingen_module._FINISH = True
+            pedal_hardware.EXIT_THREADS = True
+        app.lastWindowClosed.connect(desktop_quit)
+        if os.environ.get("BEEBO_SCREENSHOT"):
+            # build checks: save a picture of the screen after a few seconds, then quit
+            def desktop_screenshot():
+                try:
+                    engine.rootObjects()[0].grabWindow().save(os.environ["BEEBO_SCREENSHOT"])
+                except Exception as e:
+                    print("screenshot failed:", e)
+                desktop_quit()
+            QTimer.singleShot(int(os.environ.get("BEEBO_SCREENSHOT_AFTER", "15000")), desktop_screenshot)
     debug_print("starting send thread")
     ingen_wrapper.start_send_thread()
     debug_print("starting recv thread")

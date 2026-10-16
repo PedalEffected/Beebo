@@ -1,3 +1,4 @@
+from beebo_paths import P
 import serial, os
 # digit main
 from collections import defaultdict
@@ -60,13 +61,13 @@ sub_graph = "ingen:/main/"
 current_bytes = bytearray()
 
 if PEDAL_TYPE == pedal_types.verbs:
-    with open("/pedal_state/verbs_presets.json") as f:
+    with open(P("/pedal_state/verbs_presets.json")) as f:
         verbs_presets = json.load(f)
 elif PEDAL_TYPE == pedal_types.ample:
-    with open("/pedal_state/ample_presets.json") as f:
+    with open(P("/pedal_state/ample_presets.json")) as f:
         verbs_presets = json.load(f)
 elif PEDAL_TYPE == pedal_types.trails:
-    with open("/pedal_state/trails_presets.json") as f:
+    with open(P("/pedal_state/trails_presets.json")) as f:
         verbs_presets = json.load(f)
 
 hardware_state = {}
@@ -106,7 +107,7 @@ cc_ordering = [
         ]
 
 try:
-    with open("/pedal_state/hardware_state.json") as f:
+    with open(P("/pedal_state/hardware_state.json")) as f:
         hardware_state = json.load(f)
         if "cab_enabled" not in hardware_state:
             hardware_state["cab_enabled"] = True
@@ -200,7 +201,7 @@ cc_effect_name_parameter_map = {v[0]: (k, *v[1:]) for k, v in effect_name_parame
 
 
 def write_hardware_state():
-    with open("/pedal_state/hardware_state.json", "w") as f:
+    with open(P("/pedal_state/hardware_state.json"), "w") as f:
         json.dump(hardware_state, f)
     os.sync()
 
@@ -381,7 +382,7 @@ def load_trails(p, from_sequencer=False):
 def import_done():
     # if we've got a set list now, parse it
     try:
-        with open("/pedal_state/set_list.txt") as f:
+        with open(P("/pedal_state/set_list.txt")) as f:
             a = f.read()
             s = a.strip().split(',')
             s_l = []
@@ -425,9 +426,9 @@ def save_verbs_preset(ignored):
     # import pprint
     # pprint.pprint(n_p)
 
-    out_file_map = {pedal_types.verbs : "/pedal_state/verbs_presets.json",
-            pedal_types.ample : "/pedal_state/ample_presets.json",
-            pedal_types.trails : "/pedal_state/trails_presets.json",
+    out_file_map = {pedal_types.verbs : P("/pedal_state/verbs_presets.json"),
+            pedal_types.ample : P("/pedal_state/ample_presets.json"),
+            pedal_types.trails : P("/pedal_state/trails_presets.json"),
             }
     with open(out_file_map[PEDAL_TYPE], "w") as f:
         json.dump(verbs_presets, f)

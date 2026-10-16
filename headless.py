@@ -1,3 +1,4 @@
+from beebo_paths import P
 import sys, time, json, os.path, os, subprocess, queue, threading, traceback, glob
 import shutil, socket
 from signal import signal, SIGINT, SIGTERM
@@ -27,7 +28,7 @@ import stat
 ingen_is_ready = False
 while not ingen_is_ready:
     try:
-        mode = os.stat("/tmp/ingen.sock").st_mode
+        mode = os.stat(P("/tmp/ingen.sock")).st_mode
         if stat.S_ISSOCK(mode):
             ingen_is_ready = True
         else:
@@ -168,7 +169,7 @@ def load_preset_list():
     preset_list_model = preset_list
 
 try:
-    with open("/pedal_state/hardware_info.json") as f:
+    with open(P("/pedal_state/hardware_info.json")) as f:
         hardware_info = json.load(f)
     hardware_info["revision"]
 except:
@@ -284,7 +285,7 @@ def jump_to_preset(is_inc, num, initial=False):
         knobs.ui_load_preset_by_name(p_list[current_preset.value])
 
 def write_pedal_state():
-    with open("/pedal_state/state.json", "w") as f:
+    with open(P("/pedal_state/state.json"), "w") as f:
         json.dump(pedal_state, f)
     os.sync()
 
@@ -292,7 +293,7 @@ def write_pedal_state():
 def load_pedal_state():
     global pedal_state
     try:
-        with open("/pedal_state/state.json") as f:
+        with open(P("/pedal_state/state.json")) as f:
             pedal_state = json.load(f)
             if "midi_channel" not in pedal_state:
                 pedal_state["midi_channel"] = 1
@@ -405,7 +406,7 @@ def from_backend_new_effect(effect_name, effect_type, x=20, y=30, is_enabled=Tru
 
                 if PEDAL_TYPE == pedal_types.ample: # pedal_types.verbs
                     # if ample load reverb
-                    knobs.update_ir("ingen:/main/stereo_reverb1", "/audio/ample_reverb.wav")
+                    knobs.update_ir("ingen:/main/stereo_reverb1", P("/audio/ample_reverb.wav"))
                     mcu_comms.set_cab()
                 mcu_comms.set_main_enable(True)
 
@@ -805,9 +806,9 @@ class Knobs():
     def ui_load_empty_preset(self, force=False):
         if force:
             # load_preset("file:///mnt/presets/beebo/Empty.ingen/main.ttl", True)
-            knobs.ui_load_qa_preset_by_name("file:///mnt/presets/beebo/Empty.ingen")
+            knobs.ui_load_qa_preset_by_name(P("file:///mnt/presets/beebo/Empty.ingen"))
         else:
-            knobs.ui_load_preset_by_name("file:///mnt/presets/beebo/Empty.ingen")
+            knobs.ui_load_preset_by_name(P("file:///mnt/presets/beebo/Empty.ingen"))
 
 
     def ui_load_preset_by_name(self, preset_file):
@@ -851,7 +852,7 @@ class Knobs():
         # update preset meta
         clean_filename = ingen_wrapper.get_valid_filename(pedalboard_name)
         if len(clean_filename) > 0:
-            filename = "/mnt/presets/beebo/"+clean_filename+".ingen"
+            filename = P("/mnt/presets/beebo/")+clean_filename+".ingen"
             global current_preset_filename
             global previous_preset_filename
             previous_preset_filename = current_preset_filename
@@ -916,9 +917,9 @@ class Knobs():
     def usb_information_text(self):
         # return how much space in mb is available
         return f"""<h3>USB info</h3>
-        <p>Cabs: {self.ui_usb_folder_size("/usb_flash/cabs")} </p>
-        <p>Reverbs: {self.ui_usb_folder_size("/usb_flash/reverbs")} </p>
-        <p>Amps: {self.ui_usb_folder_size("/usb_flash/amps")} </p>
+        <p>Cabs: {self.ui_usb_folder_size(P("/usb_flash/cabs"))} </p>
+        <p>Reverbs: {self.ui_usb_folder_size(P("/usb_flash/reverbs"))} </p>
+        <p>Amps: {self.ui_usb_folder_size(P("/usb_flash/amps"))} </p>
         <h3>Remaining user storage</h3>
         <p>{self.remaining_user_storage()}</p>
         """
@@ -961,7 +962,7 @@ class Knobs():
         # if the drive can't be remounted RW then auto repair the drive and restart
         # /sbin/e2fsck -fy /dev/mmcblk0p1
         command_status[0].name = "Firmware update failed. The files were found, the flash drive appears to work but something else happened, please contact us. info@polyeffects.com Extra debugging info:"
-        if len(glob.glob("/usb_flash/*.deb")) > 0:
+        if len(glob.glob(P("/usb_flash/*.deb"))) > 0:
             command = """sudo /usr/bin/polyoverlayroot-chroot dpkg -i -E -G /usb_flash/*.deb && sync && sudo shutdown -h 'now'"""
             # sync then sleep before shutdown
             command_status[0].value = -1
@@ -985,7 +986,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
             command_status[0].value = 1
 
     def ui_run_debug(self):
-        if len(glob.glob("/usb_flash/*.sh")) > 0:
+        if len(glob.glob(P("/usb_flash/*.sh"))) > 0:
             command = """sudo /bin/bash /usb_flash/debug.sh"""
             command_status[0].value = -1
             self.launch_subprocess(command)
@@ -1032,7 +1033,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
     def set_preset_list_length(self, v):
         if (v > len(preset_list_model)):
             # debug_print("inserting new row in preset list", v)
-            insert_row(preset_list_model, "file:///mnt/presets/beebo/Default_Preset.ingen")
+            insert_row(preset_list_model, P("file:///mnt/presets/beebo/Default_Preset.ingen"))
         else:
             # debug_print("removing row in preset list", v)
             preset_list_model.removeRows(v, 1)
@@ -1093,7 +1094,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
         ir = ir[len("file://"):]
         # can be a directory or file
         # check if it isn't a base dir. 
-        if "imported" not in ir or ir in ["/audio/cabs/imported", "/audio/reverbs/imported"]:
+        if "imported" not in ir or ir in [P("/audio/cabs/imported"), P("/audio/reverbs/imported")]:
             return
         # delete
         # remount as RW
@@ -1116,10 +1117,10 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
         # remount as RW
         command = "sudo mount -o remount,rw /dev/mmcblk0p2 /mnt"
         ret_var = subprocess.call(command, shell=True)
-        shutil.rmtree("/mnt/audio/cabs")
-        shutil.rmtree("/mnt/audio/reverbs")
-        os.mkdir("/mnt/audio/cabs")
-        os.mkdir("/mnt/audio/reverbs")
+        shutil.rmtree(P("/mnt/audio/cabs"))
+        shutil.rmtree(P("/mnt/audio/reverbs"))
+        os.mkdir(P("/mnt/audio/cabs"))
+        os.mkdir(P("/mnt/audio/reverbs"))
         os.sync()
         # remount as RO
         command = "sudo mount -o remount,ro /dev/mmcblk0p2 /mnt"
@@ -1130,7 +1131,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
         debug_print("delete: preset_file files is ", preset_file)
         # is always a directory
         # empty / default
-        if ".ingen" not in preset_file or preset_file in ["/mnt/presets/digit/Default_Preset.ingen", "/mnt/presets/beebo/Empty.ingen", "/mnt/presets/digit/Empty.ingen"]:
+        if ".ingen" not in preset_file or preset_file in [P("/mnt/presets/digit/Default_Preset.ingen"), P("/mnt/presets/beebo/Empty.ingen"), P("/mnt/presets/digit/Empty.ingen")]:
             return
         # delete
         try: # if it doesn't exist, we still want to remove it from the preset list and meta cache
@@ -1149,7 +1150,7 @@ you'll need to flash the usb flash drive to a format that works for Beebo, pleas
 
     def save_preset_list(self):
         debug_print("saving preset list")
-        with open("/mnt/pedal_state/beebo_preset_list.json", "w") as f:
+        with open(P("/mnt/pedal_state/beebo_preset_list.json"), "w") as f:
             json.dump(preset_list_model, f)
         os.sync()
     preset_list_model = preset_list
@@ -1379,12 +1380,12 @@ def toggle_tuner():
         return
     preset_load_counter.value = preset_load_counter.value + 1
 
-    if current_preset_filename == "/mnt/presets/beebo/Tuner.ingen":
+    if current_preset_filename == P("/mnt/presets/beebo/Tuner.ingen"):
         # if we've got a previous_preset, jump to it
         if previous_preset_filename != "":
             knobs.ui_load_preset_by_name("file://"+previous_preset_filename)
     else:
-        knobs.ui_load_preset_by_name("file:///mnt/presets/beebo/Tuner.ingen")
+        knobs.ui_load_preset_by_name(P("file:///mnt/presets/beebo/Tuner.ingen"))
 
 start_tap_time = {"foot_switch_a":None, "foot_switch_b":None, "foot_switch_c":None, "foot_switch_d":None, "foot_switch_e":None}
 ## tap callback is called by hardware button from the GPIO checking thread

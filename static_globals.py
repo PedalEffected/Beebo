@@ -1,5 +1,7 @@
 from enum import Enum, IntEnum
-IS_REMOTE_TEST = False
+from beebo_paths import IS_DESKTOP
+# On a desktop there is no pedal hardware (footswitches, encoders, MCU, ALSA mixer).
+IS_REMOTE_TEST = IS_DESKTOP
 
 pedal_types = Enum("pedals", """verbs
 ample

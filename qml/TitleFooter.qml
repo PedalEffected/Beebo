@@ -8,6 +8,10 @@ import "polyconst.js" as Constants
 Item {
     id: title_footer
     property PatchBay patch_single
+    Component.onCompleted: {
+        beeboWindow.title_footer = title_footer
+        beeboWindow.patch_single = Qt.binding(function() { return title_footer.patch_single })
+    }
     property bool show_help: false
     property real beat_msec: 60 / currentBPM.value * 1000
     property real current_footer_value: 0
