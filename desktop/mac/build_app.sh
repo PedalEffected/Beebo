@@ -81,10 +81,13 @@ rm -rf "$RES/ingen/include" "$RES/ingen/share/man"
 step "JACK"
 JACK="$(brew --prefix jack)"
 mkdir -p "$RES/jack/bin" "$RES/jack/lib/jack"
-for b in jackd jack_connect jack_disconnect jack_lsp; do
-  cp "$JACK/bin/$b" "$RES/jack/bin/"
-done
+cp "$JACK/bin/jackd" "$RES/jack/bin/"
+# Homebrew's JACK doesn't include jack_lsp / jack_connect any more: build ours
+cc -O2 -o "$RES/jack/bin/jack_lsp" "$ROOT/desktop/jack_tools.c" $(pkg-config --cflags --libs jack)
+cp "$RES/jack/bin/jack_lsp" "$RES/jack/bin/jack_connect"
+cp "$RES/jack/bin/jack_lsp" "$RES/jack/bin/jack_disconnect"
 cp "$JACK"/lib/jack/*.so "$RES/jack/lib/jack/" 2>/dev/null || true
+ls "$JACK/lib/jack" | tee "$REPORT/jack-drivers.txt"
 chmod -R u+w "$RES/jack"
 
 # ------------------------------------------------------------------ modules
