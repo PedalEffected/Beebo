@@ -491,15 +491,22 @@ def r_blop():
 
 
 def r_omins():
-    # omins has no release tarball on download.drobilla.net; use its git repo
-    for url in ("https://gitlab.com/drobilla/omins.lv2", "https://gitlab.com/drobilla/omins-lv2",
-                "https://gitlab.com/drobilla/omins", "https://git.drobilla.net/omins.lv2"):
-        if subprocess.run(["git", "ls-remote", "-q", url], capture_output=True,
-                          env=dict(os.environ, GIT_TERMINAL_PROMPT="0")).returncode == 0:
-            log("omins source:", url)
-            _build_drobilla_src(git("omins", url))
-            return
-    raise RuntimeError("omins source not found (tried gitlab.com/drobilla and git.drobilla.net)")
+    """The two omins envelopes Beebo uses. Their LV2 port was never released,
+    so build the original LADSPA code (omins 0.2.0, GPL) inside a small LV2
+    shell (desktop/omins_lv2) with the same URIs and port symbols."""
+    src = tarball("omins", "http://archive.ubuntu.com/ubuntu/pool/universe/o/omins/omins_0.2.0.orig.tar.gz")
+    shell = os.path.join(HERE, "omins_lv2")
+    out = os.path.join(OUT, "omins.lv2")
+    os.makedirs(out, exist_ok=True)
+    cc = os.environ.get("CC", "cc")
+    for name in ("adenv", "adenv_lvl"):
+        run([cc, "-O2", "-fPIC", "-shared", "-fvisibility=hidden", "-I" + shell,
+             "-D_init=omins_init", "-D_fini=omins_fini",
+             '-DPLUGIN_URI="http://drobilla.net/plugins/omins/%s"' % name,
+             os.path.join(src, "src", name + ".c"), os.path.join(shell, "lv2_wrap.c"),
+             "-lm", "-o", os.path.join(out, name + ".so")])
+    for ttl in ("manifest.ttl", "adenv.ttl", "adenv_lvl.ttl"):
+        shutil.copy(os.path.join(shell, ttl), out)
 
 
 def r_fomp():
@@ -611,8 +618,8 @@ def fix_binaries():
             if os.path.exists(want):
                 continue
             stem = os.path.splitext(want)[0]
-            for ext in (".so", ".dylib", ".bundle"):
-                if os.path.exists(stem + ext):
+            for ext in (".so", ".dylib", ".bundle", ".", ""):
+                if os.path.isfile(stem + ext):
                     os.rename(stem + ext, want)
                     log("  renamed %s -> %s" % (os.path.basename(stem + ext), n))
                     break

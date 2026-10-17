@@ -1,0 +1,12 @@
+@prefix lv2:  <http://lv2plug.in/ns/lv2core#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<http://drobilla.net/plugins/omins/adenv>
+	a lv2:Plugin ;
+	lv2:binary <adenv.so> ;
+	rdfs:seeAlso <adenv.ttl> .
+
+<http://drobilla.net/plugins/omins/adenv_lvl>
+	a lv2:Plugin ;
+	lv2:binary <adenv_lvl.so> ;
+	rdfs:seeAlso <adenv_lvl.ttl> .
