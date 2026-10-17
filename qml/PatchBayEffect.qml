@@ -679,8 +679,19 @@ Rectangle {
                 two_finger_connect_clicked(true);
                 patch_single.current_help_text = Constants.help["hold"];
                 patch_bay.multi_touch_connect = false;
+                // desktop: with Command held, stay in hold mode after the
+                // click, so a Command-click on another module connects
+                if (typeof desktopUI !== "undefined" && desktopUI.cmdHeld()) {
+                    patch_bay.desktop_sticky_hold = true;
+                    patch_single.current_help_text = "Keep holding Command and click the module to connect to";
+                }
             }
 			else if (patch_bay.currentMode == PatchBay.Hold){
+                if (patch_bay.desktop_sticky_hold && patch_bay.selected_effect === rect) {
+                    // clicked the source again: nothing to connect
+                    return;
+                }
+                patch_bay.desktop_sticky_hold = false;
                 patch_bay.cancel_expand = false;
 				rect.was_hold = true;
                 patch_bay.multi_touch_connect = true;
@@ -704,9 +715,13 @@ Rectangle {
 			patch_bay.isMoving = false;
 			// if we set hold, reset to select
 			if (rect.set_hold){
-                patch_bay.currentMode = PatchBay.Select;
-				patch_bay.current_help_text = Constants.help["select"];
                 rect.set_hold = false;
+                // Command-click (desktop): keep hold mode until Command is
+                // released or a second module is clicked
+                if (!patch_bay.desktop_sticky_hold) {
+                    patch_bay.currentMode = PatchBay.Select;
+                    patch_bay.current_help_text = Constants.help["select"];
+                }
 			}
 
 			if (!rect.beginDrag.fuzzyEquals(Qt.vector2d(rect.x, rect.y), 6)){

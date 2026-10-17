@@ -43,6 +43,23 @@ import "module_info.js" as ModuleInfo
         property bool from_hold: false
         property bool more_hold: false
         property bool multi_touch_connect: false
+        // desktop: Command-click a module, then Command-click another to connect
+        // (a mouse can't hold one module and touch a second like a finger can)
+        property bool desktop_sticky_hold: false
+        Timer {
+            interval: 100
+            repeat: true
+            running: patch_bay.desktop_sticky_hold
+            onTriggered: {
+                if (typeof desktopUI === "undefined" || !desktopUI.cmdHeld()) {
+                    patch_bay.desktop_sticky_hold = false;
+                    if (patch_bay.currentMode == PatchBay.Hold) {
+                        patch_bay.currentMode = PatchBay.Select;
+                        patch_bay.current_help_text = Constants.help["select"];
+                    }
+                }
+            }
+        }
         property bool in_spotlight: false
         property bool cancel_expand: false
         property var effect_map: {"invalid":"b"}
