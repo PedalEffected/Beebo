@@ -58,8 +58,17 @@ Everything you make lives in **~/Beebo**:
 ## Modules
 
 `build_plugins.py` builds every open-source module the screen offers, from
-each project's source at a fixed version, and writes a report. Missing from
-the desktop build:
+each project's source, and writes a report. A few need fixes to run on a
+desktop, which the script applies itself:
+
+- **attenuverter** (blop's "product"): the stock plugin crashes Ingen, so it
+  is built as a plain CV module.
+- **AD envelope** and **AD envelope with levels** (omins): their LV2 versions
+  were never published, so `omins_lv2/` wraps the original LADSPA code under
+  the same plugin IDs and port names, which keeps presets working.
+- **stone-phaser**: an empty `modgui.ttl` is added so the plugin loads.
+
+Missing from the desktop build:
 
 - **Modules Poly Effects hasn't published the source for:** delay, wet/dry
   (and stereo), foot switches, tonestack, bitcrusher, MIDI note to CV (mono
