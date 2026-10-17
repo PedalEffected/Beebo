@@ -7,22 +7,35 @@
  *   jack_lsp                     list ports (exit 1 if no server is running)
  *   jack_connect A B             connect two ports
  *   jack_disconnect A B          disconnect two ports
+ *   jack_check                   exit 0 if JACK's audio cycle is running,
+ *                                3 if the server is up but no audio flows
  *
  *   cc -O2 -o jack_lsp jack_tools.c $(pkg-config --cflags --libs jack)
  */
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #include <jack/jack.h>
+
+static volatile unsigned long cycles = 0;
+
+static int count_cycle(jack_nframes_t n, void* arg)
+{
+    (void)n; (void)arg;
+    cycles++;
+    return 0;
+}
 
 int main(int argc, char **argv)
 {
     const char *name = strrchr(argv[0], '/');
     name = name ? name + 1 : argv[0];
     int is_lsp = strstr(name, "lsp") != NULL;
+    int is_check = strstr(name, "check") != NULL;
     int is_disconnect = strstr(name, "disconnect") != NULL;
 
-    if (!is_lsp && argc != 3) {
+    if (!is_lsp && !is_check && argc != 3) {
         fprintf(stderr, "usage: %s <port> <port>\n", name);
         return 2;
     }
@@ -35,7 +48,21 @@ int main(int argc, char **argv)
     }
 
     int rc = 0;
-    if (is_lsp) {
+    if (is_check) {
+        /* count our own process callbacks for about a second */
+        jack_set_process_callback(c, count_cycle, NULL);
+        if (jack_activate(c)) {
+            fprintf(stderr, "can't activate\n");
+            jack_client_close(c);
+            return 1;
+        }
+        for (int i = 0; i < 15 && cycles < 5; i++)
+            usleep(100000);
+        printf("audio cycles in test: %lu (sample rate %u, buffer %u)\n", cycles,
+               jack_get_sample_rate(c), jack_get_buffer_size(c));
+        rc = cycles >= 5 ? 0 : 3;
+        jack_deactivate(c);
+    } else if (is_lsp) {
         const char **ports = jack_get_ports(c, NULL, NULL, 0);
         for (int i = 0; ports && ports[i]; i++)
             printf("%s\n", ports[i]);

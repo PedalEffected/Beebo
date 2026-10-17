@@ -267,7 +267,7 @@ class Engine:
         os.makedirs(LOG_DIR, exist_ok=True)
 
     def spawn(self, name, args):
-        logf = open(os.path.join(LOG_DIR, name + ".log"), "w")
+        logf = open_log(name)
         log("starting", name, ":", " ".join(args))
         p = subprocess.Popen(args, env=self.env, stdout=logf, stderr=subprocess.STDOUT,
                              start_new_session=True)
@@ -302,6 +302,22 @@ class Engine:
                 return
             time.sleep(0.1)
         raise SystemExit("JACK didn't start; see %s" % os.path.join(LOG_DIR, "jackd.log"))
+
+    def audio_running(self):
+        """True if JACK's audio cycle is actually running. Some device
+        combinations start without error but never clock (for example an
+        input and an output at different sample rates); then nothing in Beebo
+        responds, so catch it here."""
+        check = find_program("jack_check")
+        if not check:
+            return True
+        try:
+            p = subprocess.run([check], env=self.env, capture_output=True, text=True, timeout=10)
+        except subprocess.TimeoutExpired:
+            log("audio check timed out")
+            return False
+        log("audio check:", (p.stdout + p.stderr).strip().splitlines()[-1:] or p.returncode)
+        return p.returncode != 3
 
     def start_ingen(self):
         ingen = find_program("ingen")
@@ -369,6 +385,28 @@ class Engine:
         self.procs = []
 
 
+def audio_problem_dialog(settings):
+    """Explain that the chosen device isn't running, then show the setup
+    window again. Returns new settings, or None to quit."""
+    sys.path.insert(0, HERE)
+    import qt_compat
+    qt_compat.install()
+    from PySide2.QtWidgets import QApplication, QMessageBox
+    app = QApplication.instance() or QApplication(sys.argv)
+    msg = QMessageBox()
+    msg.setIcon(QMessageBox.Warning)
+    msg.setWindowTitle("Beebo audio")
+    msg.setText("The audio device started but no audio is running through it.")
+    msg.setInformativeText(
+        "This happens when the input and output devices can't run together, for "
+        "example when they are set to different sample rates in Audio MIDI Setup, or "
+        "when a device is busy. Pick another device, or one device for both input and "
+        "output.")
+    msg.setStandardButtons(QMessageBox.Ok)
+    msg.exec() if hasattr(msg, "exec") else msg.exec_()
+    return setup_dialog(settings)
+
+
 def _num(port):
     m = re.search(r"(\d+)$", port)
     return int(m.group(1)) if m else 0
@@ -410,12 +448,60 @@ def option_key_held():
         return False
 
 
+_ROTATED = set()
+
+
+def open_log(name):
+    """logs/<name>.log. The first time in a session, the previous session's
+    log is kept as <name>.prev.log, so it survives a restart (for example
+    after a freeze); later restarts in the same session append."""
+    os.makedirs(LOG_DIR, exist_ok=True)
+    path = os.path.join(LOG_DIR, name + ".log")
+    if name not in _ROTATED:
+        _ROTATED.add(name)
+        if os.path.exists(path):
+            try:
+                os.replace(path, os.path.join(LOG_DIR, name + ".prev.log"))
+            except OSError:
+                pass
+    return open(path, "a")
+
+
+def stop_leftovers():
+    """Stop Beebo processes (screen, Ingen, JACK) still running from an earlier
+    session of this app, e.g. after a freeze. They hold the engine socket and
+    the screen's OSC port, and a new session can't start while they run."""
+    patterns = [os.path.join(UI, "beebo_desktop_ui.py")]
+    for prog in ("ingen", "jackd"):
+        path = find_program(prog)
+        # only our own copies, never a JACK or Ingen the user runs elsewhere
+        if path and os.path.realpath(path).startswith(os.path.realpath(RES) + os.sep):
+            patterns.append(path)
+    me = os.getpid()
+    found = []
+    for pat in patterns:
+        out = subprocess.run(["pgrep", "-f", pat], capture_output=True, text=True).stdout
+        found += [int(x) for x in out.split() if x.strip().isdigit() and int(x) != me]
+    if not found:
+        return
+    log("stopping leftover Beebo processes:", found)
+    for sig in (signal.SIGTERM, signal.SIGKILL):
+        for pid in found:
+            try:
+                os.kill(pid, sig)
+            except OSError:
+                pass
+        time.sleep(1.5)
+
+
 def main():
     if "--list" in sys.argv:
         for d in list_devices(load_settings()["driver"]):
             print("%-40s %-40s %d in / %d out" % d)
         return 0
     beebo_paths.ensure_dirs()
+    if os.environ.get("BEEBO_RESOURCES"):   # running from Beebo.app
+        stop_leftovers()
     install_factory_presets()
     settings = load_settings()
     first_run = not os.path.exists(SETTINGS_PATH)
@@ -444,13 +530,22 @@ def main():
         engine = state["engine"] = Engine(settings)
         try:
             engine.start_jack()
+            if not engine.audio_running():
+                engine.stop()
+                state["engine"] = None
+                new = audio_problem_dialog(settings)
+                if new is None:
+                    return 0
+                settings = new
+                continue
             engine.start_ingen()
             engine.connect_ports()
             log("starting the Beebo screen")
-            ui_log = open(os.path.join(LOG_DIR, "ui.log"), "w")
+            ui_log = open_log("ui")
             env = dict(engine.env)
             env["PYTHONUNBUFFERED"] = "1"
             env["BEEBO_AUDIO_SETUP_REQUEST"] = AUDIO_SETUP_REQUEST
+            env["BEEBO_LAUNCHER_PID"] = str(os.getpid())
             ui = subprocess.Popen([sys.executable, os.path.join(UI, "beebo_desktop_ui.py")],
                                   env=env, stdout=ui_log, stderr=subprocess.STDOUT)
             ui.wait()

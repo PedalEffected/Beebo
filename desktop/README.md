@@ -50,6 +50,24 @@ another for **Outputs to**, or open **Audio MIDI Setup**, click **+**, choose
 in Beebo. The "Beebo IN / OUT ... channels" boxes choose which channels of the
 device the Hector's 6 inputs and 8 outputs use.
 
+### Using the screen with a mouse
+
+- **Zoom:** use the slider above the screen, the − and + buttons, the
+  **View** menu, or Cmd + mouse wheel / trackpad scroll. **Fit** (Cmd+0)
+  returns to fitting the window. When zoomed in, scroll to move around.
+- **Connecting modules** (the pedal's "hold one, tap another"): hold
+  **Command**, click the first module, keep holding Command and click the
+  second. The port list appears just like on the pedal. Release Command to
+  cancel.
+
+### If Beebo freezes or won't open
+
+Beebo writes what it was doing to `~/Beebo/logs` (`ui.log`, `ingen.log`,
+`jackd.log` and, if the screen stops responding, `ui-freeze.log`). If audio
+doesn't start with the chosen device, Beebo says so and shows the audio
+setup window again. Leftover Beebo processes from a crash are stopped
+automatically at the next start.
+
 ### Your files
 
 Everything you make lives in **~/Beebo**:
