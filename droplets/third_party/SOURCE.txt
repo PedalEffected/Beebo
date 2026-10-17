@@ -1,0 +1,5 @@
+Engine source: https://github.com/pichenettes/eurorack (beads/, stmlib submodule)
+eurorack commit: f4cfa7697095a28d292bff758beb51deb49b5a86
+stmlib commit:   e3bd7c9cc00e4364166f9905c0509b6ffd0535ec
+Unmodified copies of the files Droplets needs. MIT license (see LICENSE-beads, LICENSE-stmlib).
+"Mutable Instruments" is a registered trademark of Emilie Gillet; Droplets is not affiliated with it.

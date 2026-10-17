@@ -312,6 +312,10 @@ Rectangle {
             patchStack.push(editPlaits, {"objectName":"editPlaits"});
             patch_bay.current_help_text = "" // Constants.help["delay_detail"]; // FIXME
 		}
+		else if (effect_type == "Droplets"){
+		    patchStack.push("Droplets.qml", {"effect_id": effect_id, "effect_type": effect_type});
+		    patch_bay.current_help_text = "SIZE fully clockwise = delay. Clock into Seed to sync."
+		}
 		else if (['granular'].indexOf(effect_type) >= 0){
             patchStack.push(editGranular);
             patch_bay.current_help_text = "" // Constants.help["delay_detail"]; // FIXME
