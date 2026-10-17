@@ -86,6 +86,7 @@ cp "$JACK/bin/jackd" "$RES/jack/bin/"
 cc -O2 -o "$RES/jack/bin/jack_lsp" "$ROOT/desktop/jack_tools.c" $(pkg-config --cflags --libs jack)
 cp "$RES/jack/bin/jack_lsp" "$RES/jack/bin/jack_connect"
 cp "$RES/jack/bin/jack_lsp" "$RES/jack/bin/jack_disconnect"
+cp "$RES/jack/bin/jack_lsp" "$RES/jack/bin/jack_check"
 cp "$JACK"/lib/jack/*.so "$RES/jack/lib/jack/" 2>/dev/null || true
 ls "$JACK/lib/jack" | tee "$REPORT/jack-drivers.txt"
 chmod -R u+w "$RES/jack"
