@@ -50,7 +50,7 @@ fetch() {  # fetch <dir> <url> <commit>
 step "Homebrew packages"
 export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_INSTALL_CLEANUP=1
 brew install meson ninja pkg-config cmake boost lv2 serd sord sratom lilv suil \
-  jack libsigc++@2 fftw libsndfile libsamplerate liblo glib uv || true
+  jack libsigc++@2 fftw libsndfile libsamplerate liblo glib uv coreutils || true
 BREW="$(brew --prefix)"
 export PKG_CONFIG_PATH="$DEPS/lib/pkgconfig:$BREW/lib/pkgconfig:$BREW/opt/libsigc++@2/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 export CPPFLAGS="-I$BREW/include ${CPPFLAGS:-}"
@@ -165,10 +165,17 @@ rm -rf "$BEEBO_DATA_DIR"
 JACKPID=$!
 sleep 3
 SOCK="/tmp/beebo-check-$$.sock"
-"$RES/ingen/bin/ingen" -e -p 2 -S "$SOCK" "$RES/factory/start_up.ingen" > "$REPORT/check-ingen.log" 2>&1 &
+# the test runs its own Ingen and restarts it if a module crashes it
+BEEBO_DESKTOP=1 "$PY" "$RES/ui/desktop/test_modules.py" "$SOCK" \
+  --start "$RES/ingen/bin/ingen" "$RES/factory/start_up.ingen" --log "$REPORT/check-ingen.log" \
+  | tee "$REPORT/modules-loaded.txt" || true
+mkdir -p "$REPORT/crashes"
+cp ~/Library/Logs/DiagnosticReports/ingen* "$REPORT/crashes/" 2>/dev/null || true
+
+# a fresh Ingen for the screen check
+"$RES/ingen/bin/ingen" -e -p 2 -S "$SOCK" "$RES/factory/start_up.ingen" >> "$REPORT/check-ingen.log" 2>&1 &
 INGENPID=$!
 for i in $(seq 1 100); do [ -S "$SOCK" ] && break; sleep 0.2; done
-BEEBO_DESKTOP=1 "$PY" "$RES/ui/desktop/test_modules.py" "$SOCK" | tee "$REPORT/modules-loaded.txt" || true
 
 step "Check: the Beebo screen starts"
 BEEBO_DESKTOP=1 BEEBO_INGEN_SOCKET="$SOCK" BEEBO_SCREENSHOT="$REPORT/screen.png" BEEBO_SCREENSHOT_AFTER=20000 \
@@ -178,6 +185,7 @@ UIPID=$!
 for i in $(seq 1 120); do kill -0 $UIPID 2>/dev/null || break; sleep 1; done
 kill -9 $UIPID 2>/dev/null || true
 kill $INGENPID $JACKPID 2>/dev/null || true
+cp ~/Library/Logs/DiagnosticReports/{ingen,python3}* "$REPORT/crashes/" 2>/dev/null || true
 
 step "Package"
 cd "$BUILD"
@@ -186,3 +194,28 @@ rm -f "$ZIP"
 ditto -c -k --sequesterRsrc --keepParent Beebo.app "$ZIP"
 du -sh Beebo.app "$ZIP" | tee -a "$REPORT/steps.log"
 echo "done: $BUILD/$ZIP"
+
+# reports, also in the log so they can be read without downloading
+step "Reports"
+for f in plugins-report.md modules-loaded.txt jack-drivers.txt; do
+  echo "----- $f"; cat "$REPORT/$f" 2>/dev/null || true
+done
+echo "----- check-ingen.log (end)"; tail -40 "$REPORT/check-ingen.log" 2>/dev/null || true
+echo "----- check-ui.log (end)"; tail -60 "$REPORT/check-ui.log" 2>/dev/null || true
+for c in "$REPORT"/crashes/*; do
+  [ -f "$c" ] || continue
+  echo "----- crash: $(basename "$c")"
+  "$PY" - "$c" <<'PYEOF' || head -c 4000 "$c"
+import json, sys
+text = open(sys.argv[1]).read()
+head, _, body = text.partition("\n")
+r = json.loads(body)
+print(r.get("exception"), r.get("termination", {}).get("indicator", ""))
+imgs = r.get("usedImages", [])
+for t in r.get("threads", []):
+    if t.get("triggered"):
+        for fr in t.get("frames", [])[:25]:
+            img = imgs[fr.get("imageIndex", 0)].get("name", "?") if imgs else "?"
+            print("  %-34s %s" % (img, fr.get("symbol", hex(fr.get("imageOffset", 0)))))
+PYEOF
+done

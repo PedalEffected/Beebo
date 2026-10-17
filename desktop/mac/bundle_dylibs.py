@@ -131,7 +131,10 @@ def main():
     # report anything still pointing outside the app
     bad = []
     for p in done:
+        own_id = sh("otool", "-D", p).splitlines()[1:]  # a library's own name isn't a dependency
         for dep in deps(p):
+            if dep in own_id:
+                continue
             if dep.startswith(("/opt/homebrew", "/usr/local", "/Users/")):
                 bad.append((p, dep))
     for p, dep in bad[:50]:

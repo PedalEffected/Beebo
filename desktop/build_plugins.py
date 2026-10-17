@@ -104,6 +104,51 @@ def tarball(name, url):
 
 # ------------------------------------------------------------------ building
 
+# CMake 4 refuses projects that declare a minimum version below 3.5
+CMAKE_OLD_OK = "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
+
+
+def darwin_setup():
+    """macOS differences that affect many projects at once."""
+    # GNU install (several Makefiles use "install -t", which macOS lacks)
+    for prefix in ("/opt/homebrew", "/usr/local"):
+        gnubin = os.path.join(prefix, "opt", "coreutils", "libexec", "gnubin")
+        if os.path.isdir(gnubin):
+            os.environ["PATH"] = gnubin + os.pathsep + os.environ["PATH"]
+            break
+    # Homebrew's LV2 only has the current header layout (lv2/core/lv2.h).
+    # Older plugins include lv2/lv2plug.in/ns/... or a bare lv2.h, so add
+    # a folder that maps those names onto the installed headers.
+    try:
+        inc = subprocess.run(["pkg-config", "--variable=includedir", "lv2"],
+                             capture_output=True, text=True).stdout.strip()
+    except OSError:
+        inc = ""
+    lv2 = os.path.join(inc, "lv2")
+    if not os.path.isdir(os.path.join(lv2, "core")):
+        return
+    compat = os.path.join(WORK, "_lv2compat")
+    ns = os.path.join(compat, "lv2", "lv2plug.in", "ns")
+    for sub in ("ext", "extensions"):
+        os.makedirs(os.path.join(ns, sub), exist_ok=True)
+    for d in sorted(os.listdir(lv2)):
+        if not os.path.isdir(os.path.join(lv2, d)) or d == "lv2plug.in":
+            continue
+        if d == "core":
+            link = os.path.join(ns, "lv2core")
+        elif d in ("ui", "units"):
+            link = os.path.join(ns, "extensions", d)
+        else:
+            link = os.path.join(ns, "ext", d)
+        if not os.path.lexists(link):
+            os.symlink(os.path.join(lv2, d), link)
+    with open(os.path.join(compat, "lv2.h"), "w") as f:
+        f.write('#include "lv2/core/lv2.h"\n')
+    for var in ("CPATH",):
+        os.environ[var] = compat + (os.pathsep + os.environ[var] if os.environ.get(var) else "")
+    log("macOS: LV2 header compatibility folder", compat)
+
+
 def patch_file(path, old, new, count=1):
     """Small source fix-up; does nothing if already applied."""
     with open(path, encoding="utf-8", errors="ignore") as f:
@@ -114,6 +159,11 @@ def patch_file(path, old, new, count=1):
 
 
 def make(path, *targets, **vars):
+    if DARWIN and "CXX" not in vars:
+        # Apple's compiler still defaults to C++98; these projects expect a
+        # modern standard (GCC on Linux defaults to C++17; C++14 still
+        # accepts the old "register" keyword some of them use)
+        vars["CXX"] = "c++ -std=gnu++14"
     args = ["make", "-j", JOBS] + list(targets)
     args += ["%s=%s" % (k, v) for k, v in vars.items()]
     return run(args, cwd=path)
@@ -136,7 +186,7 @@ def meson_install(path, *opts):
 
 def cmake_install(path, *opts):
     build = os.path.join(path, "build-beebo")
-    run(["cmake", "-S", path, "-B", build, "-DCMAKE_BUILD_TYPE=Release",
+    run(["cmake", "-S", path, "-B", build, "-DCMAKE_BUILD_TYPE=Release", CMAKE_OLD_OK,
          "-DCMAKE_INSTALL_PREFIX=" + os.path.join(WORK, "_prefix")] + list(opts))
     run(["cmake", "--build", build, "-j", JOBS])
     return build
@@ -188,12 +238,16 @@ def r_poly_filters():
     # the Makefile expects poly_filter.cpp; the file is poly_filters.cpp
     if not os.path.exists(os.path.join(src, "poly_filter.cpp")):
         shutil.copy(os.path.join(src, "poly_filters.cpp"), os.path.join(src, "poly_filter.cpp"))
+    # uses std::tan / std::pow without including <cmath> (GCC lets that pass)
+    patch_file(os.path.join(src, "poly_filter.cpp"), '#include <math.h>', '#include <math.h>\n#include <cmath>')
     make_install(src)
 
 
 def r_polyconvo():
     src = git("polyconvo.lv2", "https://github.com/polyeffects/polyconvo.lv2")
-    make_install(src, STATICZITA="yes", CXXFLAGS=OPT + " -Wall")
+    # uses std::string / std::min without including them (GCC lets that pass)
+    make_install(src, STATICZITA="yes",
+                 CXXFLAGS=OPT + " -Wall -include string -include algorithm -include cmath")
 
 
 def r_tuna():
@@ -311,7 +365,7 @@ def r_infamous():
     os.makedirs(build, exist_ok=True)
     out = os.path.join(WORK, "_infamous")
     # GUIs need NTK, which isn't available on macOS; the plugins work without.
-    run(["cmake", "..", "-DCMAKE_BUILD_TYPE=Release", "-DCMAKE_INSTALL_PREFIX=" + out,
+    run(["cmake", "..", "-DCMAKE_BUILD_TYPE=Release", CMAKE_OLD_OK, "-DCMAKE_INSTALL_PREFIX=" + out,
          "-DLIBDIR=lib", "-DLV2_INSTALL_DIR=" + out + "/lv2"], cwd=build)
     for t in ("envfollower", "powercut", "stuck"):
         run(["cmake", "--build", ".", "--target", t, "-j", JOBS], cwd=build)
@@ -342,6 +396,9 @@ def r_midimsg():
 def r_nam():
     src = git("neural-amp-modeler-lv2", "https://github.com/polyeffects/neural-amp-modeler-lv2",
               submodules=True)
+    # libstdc++fs is GCC's; on macOS std::filesystem is in libc++ itself
+    patch_file(os.path.join(src, "CMakeLists.txt"), "link_libraries(stdc++fs)",
+               "if(NOT APPLE)\n  link_libraries(stdc++fs)\nendif()")
     build = cmake_install(src, "-DUSE_NATIVE_ARCH=OFF")
     found = glob.glob(os.path.join(build, "**", "neural_amp_modeler.lv2"), recursive=True)
     if not found:
@@ -350,7 +407,18 @@ def r_nam():
 
 
 def _drobilla(name, version):
-    src = tarball(name, "https://download.drobilla.net/%s-%s.tar.xz" % (name, version))
+    url = "https://download.drobilla.net/%s-%s.tar.xz" % (name, version)
+    try:
+        urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=30)
+    except Exception:
+        # not there: take the newest release listed on the download page
+        index = urllib.request.urlopen("https://download.drobilla.net/", timeout=30).read().decode()
+        found = re.findall(r'href="(%s-([0-9.]+)\.tar\.(?:xz|bz2|gz))"' % re.escape(name), index)
+        if not found:
+            raise RuntimeError("no %s release on download.drobilla.net" % name)
+        best = max(found, key=lambda f: [int(x) for x in f[1].split(".") if x.isdigit()])
+        url = "https://download.drobilla.net/" + best[0]
+    src = tarball(name, url)
     if os.path.exists(os.path.join(src, "meson.build")):
         meson_install(src)
     else:
@@ -407,6 +475,12 @@ def r_gx():
     # "make mod" builds the plugin without its X11 GUI
     for d in ("GxCreamMachine.lv2", "GxSVT.lv2", "GxSlowGear.lv2", "GxSupersonic.lv2"):
         p = os.path.join(src, d)
+        if DARWIN:
+            # ELF section names (".rt.text") aren't valid in Mach-O; the
+            # sections are only a hint for memory locking, so drop them
+            for f in glob.glob(os.path.join(p, "plugin", "*.cpp")):
+                patch_file(f, '__attribute__((section(".rt.text")))', "", count=-1)
+                patch_file(f, '__attribute__((section(".rt.data")))', "", count=-1)
         make(p, "mod")
         built = [b for b in glob.glob(os.path.join(p, "gx_*.lv2")) if os.path.isfile(os.path.join(b, "manifest.ttl"))]
         if not built:
@@ -544,6 +618,8 @@ def main():
         os.makedirs(d, exist_ok=True)
     LOG = open(os.path.join(REPORT_DIR, "plugins-build.log"), "a")
     only = set(args.only.split(",")) if args.only else None
+    if DARWIN:
+        darwin_setup()
     results = []
     for name, fn in RECIPES:
         if only and name not in only:
