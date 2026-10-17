@@ -63,7 +63,8 @@ device the Hector's 6 inputs and 8 outputs use.
 ### If Beebo freezes or won't open
 
 Beebo writes what it was doing to `~/Beebo/logs` (`ui.log`, `ingen.log`,
-`jackd.log` and, if the screen stops responding, `ui-freeze.log`). If audio
+`jackd.log` and, if the screen stops responding, `ui-freeze.log`; the
+previous run's logs are kept as `*.prev.log`). If audio
 doesn't start with the chosen device, Beebo says so and shows the audio
 setup window again. Leftover Beebo processes from a crash are stopped
 automatically at the next start.
