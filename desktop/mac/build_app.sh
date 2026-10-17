@@ -200,6 +200,10 @@ step "Reports"
 for f in plugins-report.md modules-loaded.txt jack-drivers.txt; do
   echo "----- $f"; cat "$REPORT/$f" 2>/dev/null || true
 done
+echo "----- check-ingen.log (errors)"
+grep -iE "ignoring|failed|error|warn" "$REPORT/check-ingen.log" 2>/dev/null | sort -u | head -80 || true
+echo "----- guitarix bundles"
+for b in "$RES"/lv2/gx_*.lv2; do echo "$b:"; ls "$b"; file "$b"/*.so "$b"/*.dylib 2>/dev/null | head -4; done
 echo "----- check-ingen.log (end)"; tail -40 "$REPORT/check-ingen.log" 2>/dev/null || true
 echo "----- check-ui.log (end)"; tail -60 "$REPORT/check-ui.log" 2>/dev/null || true
 for c in "$REPORT"/crashes/*; do

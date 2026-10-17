@@ -618,6 +618,22 @@ def fix_binaries():
                     break
 
 
+def fill_missing_seealso():
+    """Some bundles list data files they don't ship (DPF plugins built without
+    their MOD GUI still name modgui.ttl). lilv then refuses to instantiate the
+    plugin, so give each missing file a valid, empty body."""
+    for bundle in glob.glob(os.path.join(OUT, "*.lv2")):
+        for ttl in glob.glob(os.path.join(bundle, "*.ttl")):
+            with open(ttl, encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+            for ref in re.findall(r"<([^>:/]+\.ttl)>", text):
+                path = os.path.join(bundle, ref)
+                if not os.path.exists(path):
+                    with open(path, "w") as f:
+                        f.write("@prefix lv2: <http://lv2plug.in/ns/lv2core#> .\n")
+                    log("  added empty %s/%s" % (os.path.basename(bundle), ref))
+
+
 def installed_plugins():
     """URI -> bundle for everything in OUT, by reading the manifests."""
     found = {}
@@ -704,6 +720,7 @@ def main():
             log("=== %s: FAILED\n%s" % (name, e))
             LOG.write(traceback.format_exc())
     fix_binaries()
+    fill_missing_seealso()
     check_against_modules(results)
 
 
