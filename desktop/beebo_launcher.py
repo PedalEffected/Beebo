@@ -243,7 +243,7 @@ class Engine:
         if not jackd:
             raise SystemExit("JACK (jackd) not found")
         s = self.s
-        args = [jackd, "--silent", "-d", s["driver"], "-r", str(s["sample_rate"]), "-p", str(s["buffer"])]
+        args = [jackd, "--silent", "-t", "2000", "-d", s["driver"], "-r", str(s["sample_rate"]), "-p", str(s["buffer"])]
         if s["driver"] in ("coreaudio", "alsa"):
             if s["capture_device"] or s["playback_device"]:
                 args += ["-C", s["capture_device"] or s["device"], "-P", s["playback_device"] or s["device"]]

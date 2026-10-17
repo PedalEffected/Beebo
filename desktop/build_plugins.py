@@ -143,9 +143,11 @@ def darwin_setup():
         if not os.path.lexists(link):
             os.symlink(os.path.join(lv2, d), link)
     with open(os.path.join(compat, "lv2.h"), "w") as f:
-        f.write('#include "lv2/core/lv2.h"\n')
-    for var in ("CPATH",):
-        os.environ[var] = compat + (os.pathsep + os.environ[var] if os.environ.get(var) else "")
+        f.write('#include "%s"\n' % os.path.join(lv2, "core", "lv2.h"))
+    # the compat folder first, then the real headers (some Makefiles replace
+    # CFLAGS entirely, so pkg-config's -I never reaches the compiler)
+    extra = compat + os.pathsep + inc
+    os.environ["CPATH"] = extra + (os.pathsep + os.environ["CPATH"] if os.environ.get("CPATH") else "")
     log("macOS: LV2 header compatibility folder", compat)
 
 
@@ -156,6 +158,21 @@ def patch_file(path, old, new, count=1):
     if old in text:
         with open(path, "w", encoding="utf-8") as f:
             f.write(text.replace(old, new, count))
+
+
+GNU_LD_FLAGS = ("-Wl,--as-needed", "-Wl,--strip-all", "-Wl,--no-undefined", "-Wl,--gc-sections",
+                "-Wl,-O1", "-Wl,--exclude-libs,ALL")
+
+
+def strip_gnu_ld_flags(root):
+    """macOS's linker rejects GNU ld options some Makefiles hard-code."""
+    if not DARWIN:
+        return
+    for dirpath, _, files in os.walk(root):
+        for f in files:
+            if f.startswith("Makefile") or f.endswith((".mk", ".mak")):
+                for flag in GNU_LD_FLAGS:
+                    patch_file(os.path.join(dirpath, f), flag, "", count=-1)
 
 
 def make(path, *targets, **vars):
@@ -221,7 +238,7 @@ def r_polylv2():
                 make_install(p)
             except RuntimeError as e:
                 failed.append(d)
-                log("  ! PolyLV2/%s failed: %s" % (d, str(e).splitlines()[0]))
+                log("  ! PolyLV2/%s failed: %s" % (d, e))
     if failed:
         raise RuntimeError("PolyLV2 parts failed: " + ", ".join(failed))
 
@@ -317,6 +334,7 @@ def r_mod_cv():
     p = os.path.join(src, "source", "mod-cv-meter")
     if not os.path.isdir(p):
         p = [d for d in glob.glob(os.path.join(src, "**", "*cv-meter*"), recursive=True) if os.path.isdir(d)][0]
+    strip_gnu_ld_flags(src)
     make(p, "NOOPT=true", "HAVE_OPENGL=false", "HAVE_CAIRO=false")
     for b in glob.glob(os.path.join(src, "**", "mod-cv-meter.lv2"), recursive=True):
         dst = copy_bundle(b)
@@ -413,9 +431,12 @@ def _drobilla(name, version):
     except Exception:
         # not there: take the newest release listed on the download page
         index = urllib.request.urlopen("https://download.drobilla.net/", timeout=30).read().decode()
-        found = re.findall(r'href="(%s-([0-9.]+)\.tar\.(?:xz|bz2|gz))"' % re.escape(name), index)
+        base = re.escape(name.replace("-lv2", "").replace(".lv2", ""))
+        found = re.findall(r'href="(%s(?:[.-]lv2)?-([0-9.]+)\.tar\.(?:xz|bz2|gz))"' % base, index)
         if not found:
-            raise RuntimeError("no %s release on download.drobilla.net" % name)
+            names = sorted(set(re.findall(r'href="([^"]*%s[^"]*)"' % base, index)))
+            raise RuntimeError("no %s release on download.drobilla.net (listed: %s)"
+                               % (name, ", ".join(names) or "none"))
         best = max(found, key=lambda f: [int(x) for x in f[1].split(".") if x.isdigit()])
         url = "https://download.drobilla.net/" + best[0]
     src = tarball(name, url)
@@ -481,6 +502,7 @@ def r_gx():
             for f in glob.glob(os.path.join(p, "plugin", "*.cpp")):
                 patch_file(f, '__attribute__((section(".rt.text")))', "", count=-1)
                 patch_file(f, '__attribute__((section(".rt.data")))', "", count=-1)
+            strip_gnu_ld_flags(p)
         make(p, "mod")
         built = [b for b in glob.glob(os.path.join(p, "gx_*.lv2")) if os.path.isfile(os.path.join(b, "manifest.ttl"))]
         if not built:

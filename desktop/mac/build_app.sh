@@ -161,7 +161,7 @@ step "Check: Ingen loads the modules"
 export LV2_PATH="$RES/lv2" INGEN_MODULE_PATH="$RES/ingen/lib" JACK_DRIVER_DIR="$RES/jack/lib/jack"
 export BEEBO_DATA_DIR="$BUILD/check-data"
 rm -rf "$BEEBO_DATA_DIR"
-"$RES/jack/bin/jackd" -d dummy -r 48000 -p 256 > "$REPORT/check-jackd.log" 2>&1 &
+"$RES/jack/bin/jackd" -t 5000 -d dummy -r 48000 -p 256 > "$REPORT/check-jackd.log" 2>&1 &
 JACKPID=$!
 sleep 3
 SOCK="/tmp/beebo-check-$$.sock"
