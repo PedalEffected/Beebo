@@ -176,6 +176,10 @@ def strip_gnu_ld_flags(root):
 
 
 def make(path, *targets, **vars):
+    if DARWIN and "STRIP" not in vars:
+        # several Makefiles pass GNU strip options (or strip one file from
+        # parallel jobs); stripping only saves space, so skip it on macOS
+        vars["STRIP"] = "true"
     if DARWIN and "CXX" not in vars:
         # Apple's compiler still defaults to C++98; these projects expect a
         # modern standard (GCC on Linux defaults to C++17; C++14 still
@@ -424,6 +428,15 @@ def r_nam():
     copy_bundle(found[0])
 
 
+def _build_drobilla_src(src):
+    if os.path.exists(os.path.join(src, "meson.build")):
+        meson_install(src)
+    else:
+        run([sys.executable, "waf", "configure", "--prefix=/usr", "--lv2dir=" + OUT], cwd=src)
+        run([sys.executable, "waf", "build"], cwd=src)
+        run([sys.executable, "waf", "install"], cwd=src)
+
+
 def _drobilla(name, version):
     url = "https://download.drobilla.net/%s-%s.tar.xz" % (name, version)
     try:
@@ -448,12 +461,45 @@ def _drobilla(name, version):
         run([sys.executable, "waf", "install"], cwd=src)
 
 
+def _patch_blop_product(src):
+    """blop's product (Beebo's attenuverter) has "morph" ports whose type the
+    host is meant to switch, and an output whose type follows the inputs.
+    Ingen leaves that auto-switching output unconnected, so the plugin writes
+    through a null pointer and takes the engine down. Beebo only uses it with
+    CV, so make it a plain CV module."""
+    ttl = os.path.join(src, "blop.lv2", "product.ttl")
+    with open(ttl, encoding="utf-8") as f:
+        text = f.read()
+    text = re.sub(r"a lv2:ControlPort ,\s*lv2:(Input|Output)Port ,\s*morph:(?:Auto)?MorphPort ;",
+                  r"a lv2:CVPort ,\n\t\t\tlv2:\1Port ;", text)
+    text = re.sub(r"\s*morph:supportsType lv2:ControlPort ,\s*lv2:CVPort\s*", "\n\t", text)
+    with open(ttl, "w", encoding="utf-8") as f:
+        f.write(text)
+    c = os.path.join(src, "src", "product.c")
+    patch_file(c, "\tplugin->input1_is_cv = 0;\n\tplugin->input2_is_cv = 0;\n\tplugin->output_is_cv = 0;",
+               "\tplugin->input1_is_cv = 1;\n\tplugin->input2_is_cv = 1;\n\tplugin->output_is_cv = 1;\n"
+               "\tplugin->input1 = plugin->input2 = NULL;\n\tplugin->output = NULL;")
+    patch_file(c, "\tfloat* const         output = plugin->output;\n",
+               "\tfloat* const         output = plugin->output;\n"
+               "\tif (!input1 || !input2 || !output) {\n\t\treturn;\n\t}\n")
+
+
 def r_blop():
-    _drobilla("blop-lv2", "1.0.4")
+    src = tarball("blop-lv2", "https://download.drobilla.net/blop-lv2-1.0.4.tar.xz")
+    _patch_blop_product(src)
+    _build_drobilla_src(src)
 
 
 def r_omins():
-    _drobilla("omins-lv2", "1.0.0")
+    # omins has no release tarball on download.drobilla.net; use its git repo
+    for url in ("https://gitlab.com/drobilla/omins.lv2", "https://gitlab.com/drobilla/omins-lv2",
+                "https://gitlab.com/drobilla/omins", "https://git.drobilla.net/omins.lv2"):
+        if subprocess.run(["git", "ls-remote", "-q", url], capture_output=True,
+                          env=dict(os.environ, GIT_TERMINAL_PROMPT="0")).returncode == 0:
+            log("omins source:", url)
+            _build_drobilla_src(git("omins", url))
+            return
+    raise RuntimeError("omins source not found (tried gitlab.com/drobilla and git.drobilla.net)")
 
 
 def r_fomp():
