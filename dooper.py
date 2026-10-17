@@ -145,7 +145,13 @@ class LooperThread:
         self.sl_port = sl_port
         self.verbose = verbose
 
-        self.server = liblo.ServerThread(self.port) #Define liblo server for replies
+        try:
+            self.server = liblo.ServerThread(self.port) #Define liblo server for replies
+        except liblo.ServerError:
+            # port taken (another app, or a Beebo screen still shutting down):
+            # any free port works, SooperLooper is always told self.server.url
+            self.server = liblo.ServerThread()
+            self.port = self.server.port
 
         self.ping_flag = Event()
 

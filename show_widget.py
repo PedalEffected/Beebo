@@ -2416,6 +2416,10 @@ if __name__ == "__main__":
         "audio": beebo_paths.url("/audio") + "/",
         "data": "file://" + beebo_paths.DATA_DIR,
         "isDesktop": IS_DESKTOP})
+    if IS_DESKTOP:
+        # zoom slider and Command-click connecting (desktop/desktop_ui.py)
+        import desktop_ui
+        context.setContextProperty("desktopUI", desktop_ui.get())
     engine.load(QUrl("qml/TopLevelWindow.qml"))
     if IS_DESKTOP:
         # closing the window quits (the pedal never closes its screen)
