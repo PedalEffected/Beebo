@@ -31,17 +31,24 @@ contains:
    open it. Open **System Settings > Privacy & Security**, scroll down and
    click **Open Anyway**. Alternatively, run this once in Terminal:
    `xattr -dr com.apple.quarantine /Applications/Beebo.app`
-3. Pick your audio interface in the window that appears. Allow microphone
-   access when macOS asks: that's how macOS describes any audio input.
+3. Pick your audio interface from the **Audio device** drop-down and click
+   **Start Beebo**. Allow microphone access when macOS asks: that's how macOS
+   describes any audio input.
 
-To use **two USB devices at once**, for example a guitar interface and an
-ES-8 for CV, open **Audio MIDI Setup**, click **+**, choose **Create
-Aggregate Device**, tick both devices, then pick the aggregate device in
-Beebo. Use the "Beebo IN / OUT ... channels" boxes to choose which channels
-of the combined device the Hector's 6 inputs and 8 outputs use.
+The audio setup window appears every time Beebo starts, with your last
+choices already selected. Plugged in a USB interface after it opened? Click
+**Refresh list**. To skip the window, untick **Show this window every time
+Beebo starts**; holding Option while Beebo starts brings it back.
 
-To change the audio setup later, quit Beebo and start it with the Option key
-held, or run `Beebo.app/Contents/MacOS/Beebo --setup` from Terminal.
+**To switch audio devices while Beebo is running**, choose **Audio > Change
+Audio Device…** in the menu bar (or press Cmd+,). Beebo stops the audio,
+shows the setup window, and starts again with the device you pick.
+
+To use **two USB devices at once**, either pick one for **Inputs from** and
+another for **Outputs to**, or open **Audio MIDI Setup**, click **+**, choose
+**Create Aggregate Device**, tick both devices and pick the aggregate device
+in Beebo. The "Beebo IN / OUT ... channels" boxes choose which channels of the
+device the Hector's 6 inputs and 8 outputs use.
 
 ### Your files
 

@@ -42,6 +42,7 @@ BUNDLED = os.path.isdir(os.path.join(RES, "ingen"))
 
 SETTINGS_PATH = beebo_paths.P("/mnt/pedal_state/desktop_audio.json")
 LOG_DIR = os.path.join(beebo_paths.DATA_DIR, "logs")
+AUDIO_SETUP_REQUEST = os.path.join(beebo_paths.DATA_DIR, "pedal_state", ".audio_setup_requested")
 
 DEFAULTS = {
     "driver": "coreaudio" if DARWIN else "alsa",
@@ -54,6 +55,7 @@ DEFAULTS = {
     "outputs": [1, 2, 3, 4, 5, 6, 7, 8],   # out_1..out_8 -> device output channels
     "midi": True,
     "threads": 2,
+    "ask_at_start": True,       # show the audio setup window at every start
 }
 
 
@@ -109,6 +111,21 @@ def save_settings(s):
         json.dump(s, f, indent=1)
 
 
+def coreaudio_channel_counts():
+    """{device name: (inputs, outputs)} from macOS's own audio report."""
+    counts = {}
+    try:
+        out = subprocess.run(["system_profiler", "SPAudioDataType", "-json"],
+                             capture_output=True, text=True, timeout=20).stdout
+        for top in json.loads(out).get("SPAudioDataType", []):
+            for d in top.get("_items", []):
+                counts[d.get("_name", "")] = (int(d.get("coreaudio_device_input", 0) or 0),
+                                              int(d.get("coreaudio_device_output", 0) or 0))
+    except Exception:
+        pass
+    return counts
+
+
 def list_devices(driver):
     """[(display name, internal name, inputs, outputs)] for the JACK driver."""
     jackd = find_program("jackd")
@@ -117,12 +134,20 @@ def list_devices(driver):
         return devices
     if driver == "coreaudio":
         try:
-            out = subprocess.run([jackd, "-d", "coreaudio", "-l"], env=program_env(),
-                                 capture_output=True, text=True, timeout=20).stdout
+            p = subprocess.run([jackd, "-d", "coreaudio", "-l"], env=program_env(),
+                               capture_output=True, text=True, timeout=20)
+            out = p.stdout + p.stderr
         except (OSError, subprocess.TimeoutExpired):
             return devices
-        for m in re.finditer(r"name = '([^']*)', internal name = '([^']*)' \(input/output channels = (\d+)/(\d+)\)", out):
-            devices.append((m.group(1), m.group(2), int(m.group(3)), int(m.group(4))))
+        channels = coreaudio_channel_counts()
+        seen = set()
+        for m in re.finditer(r"name = '([^']*)', internal name = '([^']*)'", out):
+            name, internal = m.group(1), m.group(2)
+            if internal in seen:
+                continue
+            seen.add(internal)
+            ins, outs = channels.get(name, (0, 0))
+            devices.append((name, internal, ins, outs))
     elif driver == "alsa":
         try:
             out = subprocess.run(["aplay", "-l"], capture_output=True, text=True).stdout
@@ -139,39 +164,51 @@ def setup_dialog(settings):
     sys.path.insert(0, HERE)
     import qt_compat
     qt_compat.install()
-    from PySide2.QtWidgets import (QApplication, QComboBox, QDialog, QDialogButtonBox,
-                                   QFormLayout, QLabel, QLineEdit, QSpinBox, QVBoxLayout)
+    from PySide2.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QDialogButtonBox,
+                                   QFormLayout, QLabel, QLineEdit, QPushButton, QSpinBox,
+                                   QVBoxLayout)
     app = QApplication.instance() or QApplication(sys.argv)
     devices = list_devices(settings["driver"])
     dlg = QDialog()
     dlg.setWindowTitle("Beebo audio setup")
     lay = QVBoxLayout(dlg)
     intro = QLabel(
-        "Pick the audio interface Beebo plays through. To use two USB devices at once "
-        "(for example a guitar interface and an ES-8 for CV), combine them into an "
-        "Aggregate Device in Audio MIDI Setup first, then pick it here." if DARWIN else
+        "Pick the audio interface Beebo plays through. To use two USB devices at once, "
+        "combine them into an Aggregate Device in Audio MIDI Setup first, then pick it "
+        "here, or choose separate devices for inputs and outputs below." if DARWIN else
         "Pick the audio interface Beebo plays through.")
     intro.setWordWrap(True)
     lay.addWidget(intro)
     form = QFormLayout()
     lay.addLayout(form)
 
-    def combo(current):
-        c = QComboBox()
-        c.addItem("System default", "")
+    def fill(c, current, first):
+        c.clear()
+        c.addItem(first, "")
         for name, internal, ins, outs in devices:
             label = name + ("  (%d in / %d out)" % (ins, outs) if ins or outs else "")
             c.addItem(label, internal)
         i = c.findData(current)
         c.setCurrentIndex(max(i, 0))
-        return c
 
-    dev = combo(settings["device"])
-    cap = combo(settings["capture_device"])
-    cap.setItemText(0, "Same as above")
-    play = combo(settings["playback_device"])
-    play.setItemText(0, "Same as above")
+    dev, cap, play = QComboBox(), QComboBox(), QComboBox()
+    fill(dev, settings["device"], "System default")
+    fill(cap, settings["capture_device"], "Same as above")
+    fill(play, settings["playback_device"], "Same as above")
+
+    def refresh():
+        nonlocal devices
+        keep = (dev.currentData(), cap.currentData(), play.currentData())
+        devices = list_devices(settings["driver"])
+        fill(dev, keep[0], "System default")
+        fill(cap, keep[1], "Same as above")
+        fill(play, keep[2], "Same as above")
+
+    rescan = QPushButton("Refresh list")
+    rescan.setToolTip("Look again for audio interfaces, for example one you just plugged in")
+    rescan.clicked.connect(refresh)
     form.addRow("Audio device", dev)
+    form.addRow("", rescan)
     form.addRow("Inputs from (optional)", cap)
     form.addRow("Outputs to (optional)", play)
     rate = QComboBox()
@@ -192,6 +229,13 @@ def setup_dialog(settings):
     threads.setRange(1, max(1, os.cpu_count() or 1))
     threads.setValue(settings["threads"])
     form.addRow("Processing threads", threads)
+    ask = QCheckBox("Show this window every time Beebo starts")
+    ask.setChecked(settings.get("ask_at_start", True))
+    lay.addWidget(ask)
+    later = QLabel("You can also change the audio device while Beebo runs: "
+                   "Audio menu > Change Audio Device." if DARWIN else "")
+    later.setWordWrap(True)
+    lay.addWidget(later)
     buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
     buttons.button(QDialogButtonBox.Ok).setText("Start Beebo")
     buttons.accepted.connect(dlg.accept)
@@ -207,7 +251,8 @@ def setup_dialog(settings):
     settings.update(device=dev.currentData(), capture_device=cap.currentData(),
                     playback_device=play.currentData(), sample_rate=rate.currentData(),
                     buffer=buf.currentData(), inputs=nums(ins.text()) or DEFAULTS["inputs"],
-                    outputs=nums(outs.text()) or DEFAULTS["outputs"], threads=threads.value())
+                    outputs=nums(outs.text()) or DEFAULTS["outputs"], threads=threads.value(),
+                    ask_at_start=ask.isChecked())
     save_settings(settings)
     return settings
 
@@ -374,35 +419,51 @@ def main():
     install_factory_presets()
     settings = load_settings()
     first_run = not os.path.exists(SETTINGS_PATH)
-    if "--setup" in sys.argv or option_key_held() or (first_run and "--no-setup" not in sys.argv):
+    ask = ("--setup" in sys.argv or option_key_held() or
+           ((first_run or settings.get("ask_at_start", True)) and "--no-setup" not in sys.argv))
+    if ask:
         settings = setup_dialog(settings)
         if settings is None:
             return 0
     for arg in sys.argv[1:]:
         if arg.startswith("--driver="):
             settings["driver"] = arg.split("=", 1)[1]
-    engine = Engine(settings)
+    state = {"engine": None}
 
     def bye(*_):
-        engine.stop()
+        if state["engine"]:
+            state["engine"].stop()
         sys.exit(0)
 
     signal.signal(signal.SIGTERM, bye)
     signal.signal(signal.SIGINT, bye)
-    try:
-        engine.start_jack()
-        engine.start_ingen()
-        engine.connect_ports()
-        log("starting the Beebo screen")
-        ui_log = open(os.path.join(LOG_DIR, "ui.log"), "w")
-        env = dict(engine.env)
-        env["PYTHONUNBUFFERED"] = "1"
-        ui = subprocess.Popen([sys.executable, os.path.join(UI, "beebo_desktop_ui.py")],
-                              env=env, stdout=ui_log, stderr=subprocess.STDOUT)
-        ui.wait()
-    finally:
-        engine.stop()
-    return 0
+    while True:
+        # the screen asks for the audio setup (Audio menu) by leaving this file
+        if os.path.exists(AUDIO_SETUP_REQUEST):
+            os.unlink(AUDIO_SETUP_REQUEST)
+        engine = state["engine"] = Engine(settings)
+        try:
+            engine.start_jack()
+            engine.start_ingen()
+            engine.connect_ports()
+            log("starting the Beebo screen")
+            ui_log = open(os.path.join(LOG_DIR, "ui.log"), "w")
+            env = dict(engine.env)
+            env["PYTHONUNBUFFERED"] = "1"
+            env["BEEBO_AUDIO_SETUP_REQUEST"] = AUDIO_SETUP_REQUEST
+            ui = subprocess.Popen([sys.executable, os.path.join(UI, "beebo_desktop_ui.py")],
+                                  env=env, stdout=ui_log, stderr=subprocess.STDOUT)
+            ui.wait()
+        finally:
+            engine.stop()
+            state["engine"] = None
+        if not os.path.exists(AUDIO_SETUP_REQUEST):
+            return 0
+        log("audio setup requested from the Beebo screen")
+        new = setup_dialog(settings)
+        if new is not None:
+            settings = new
+        # cancelled: start again with the same settings
 
 
 if __name__ == "__main__":
